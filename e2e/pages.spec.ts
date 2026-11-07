@@ -76,10 +76,10 @@ test.describe('2D 페이지', () => {
   });
 });
 
-test.describe('3D 페이지', () => {
+test.describe('3D 페이지 (축대칭 CPU 모드)', () => {
   test('3D 장면이 그려지고 공이 뜸, 횡방향 안정, fps 표시', async ({ page }) => {
     const errors = collectErrors(page);
-    await page.goto('./3d.html');
+    await page.goto('./3d.html?mode=cpu');
     await expect(page.getByRole('heading', { name: '초음파 공중부양 3D' })).toBeVisible();
     await expect(page.locator('canvas.view3d-canvas')).toBeVisible();
     await expect(mainStatus(page)).toHaveText('부양', { timeout: 60_000 });
@@ -93,7 +93,7 @@ test.describe('3D 페이지', () => {
   });
 
   test('위 발생기 출력을 크게 줄이면 횡방향 불안정 표시', async ({ page }) => {
-    await page.goto('./3d.html');
+    await page.goto('./3d.html?mode=cpu');
     await expect(page.locator('.lateral .status strong')).toBeVisible({ timeout: 60_000 });
     await setSlider(page, '위 발생기 출력', 0.1);
     await expect(page.locator('.lateral .status strong')).toHaveText('불안정', { timeout: 30_000 });
@@ -101,7 +101,7 @@ test.describe('3D 페이지', () => {
   });
 
   test('밀림 효과 카드와 키보드 회전', async ({ page }) => {
-    await page.goto('./3d.html');
+    await page.goto('./3d.html?mode=cpu');
     await expect(page.locator('.push-card')).toContainText('평형 위치 이동', { timeout: 60_000 });
     const canvas = page.locator('canvas.view3d-canvas');
     await canvas.focus();
@@ -113,7 +113,7 @@ test.describe('3D 페이지', () => {
   });
 
   test('2D로 돌아가는 링크', async ({ page }) => {
-    await page.goto('./3d.html');
+    await page.goto('./3d.html?mode=cpu');
     await page.getByRole('link', { name: /2D 단면으로/ }).click();
     await expect(page.getByRole('heading', { name: '초음파 공중부양' })).toBeVisible();
   });
