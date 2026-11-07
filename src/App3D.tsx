@@ -7,6 +7,7 @@ import View3D, { type View3DOptions } from './components3d/View3D';
 import StatsPanel from './components/StatsPanel';
 import { defaultParams, type SimParams } from './physics/params';
 import { makeMedium } from './physics/acoustics';
+import { gorkovSizeWarning } from './physics/gorkov';
 import { AMP_RATIO_SLIDER } from './state/sliders';
 import { useSimulation } from './state/useSimulation';
 import './index.css';
@@ -21,7 +22,7 @@ export default function App3D() {
   const { params, scene, simRef } = sim;
   const [view, setView] = useState<View3DOptions>({ planes: true, opacity: 0.85, nodes: true });
   const halfLambda = makeMedium(params.f, params.T).lambda / 2;
-  const tooBig = params.ballDiameter > halfLambda;
+  const tooBig = gorkovSizeWarning(params.ballDiameter, 2 * halfLambda);
 
   return (
     <div className="app">

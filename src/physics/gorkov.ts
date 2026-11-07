@@ -136,3 +136,8 @@ export function gorkovPotential(p2: number, g2: number, med: Medium, p: Particle
       (0.375 * p.f2 * g2) / (med.omega * med.omega * med.rho0))
   );
 }
+
+/** Gor'kov 근사(작은 공) 한계 경고: 공 지름이 반파장 λ/2보다 크면 true (PLAN_3D 6장) */
+export function gorkovSizeWarning(diameter: number, lambda: number): boolean {
+  return diameter > lambda / 2;
+}
