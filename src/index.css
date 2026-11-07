@@ -558,3 +558,23 @@ button.snap small {
 .lateral .graph-canvas {
   margin-top: 8px;
 }
+
+/* 3D: 경고, 밀림 카드 */
+.warn {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: 13px;
+}
+.push-card {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+.push-card .note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}

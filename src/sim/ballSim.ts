@@ -12,7 +12,7 @@ import {
   RELEASE_OFFSET_X,
   RELEASE_OFFSET_Z,
 } from '../physics/constants';
-import { sampleForceFor } from '../physics/field2d';
+import { sampleForceFor, samplePush } from '../physics/field2d';
 import { makeParticle, maxForce, maxLevitationDensity, stiffness } from '../physics/gorkov';
 import { dampingCoeff, initState, verletStep, type BallState, type Dynamics } from '../physics/integrator';
 import type { Scene } from './scene';
@@ -90,6 +90,8 @@ export function sceneDynamics(scene: Scene, g = GRAVITY, rhoP = scene.particle.r
   const pg = scene.potential;
   const p = scene.particle;
   const load: Load = { rhoP: p.rhoP, V: p.V, f1: p.f1, f2: p.f2 };
+  const pushK = scene.pushCoeff * s2;
+  const push = { fx: 0, fz: 0 };
   const dyn: SceneDynamics = {
     m: p.m,
     cd: scene.cd,
@@ -99,6 +101,12 @@ export function sceneDynamics(scene: Scene, g = GRAVITY, rhoP = scene.particle.r
     load,
     force: (x, z, out) => {
       sampleForceFor(pg, s2, load.V, load.f1, load.f2, x, z, out);
+      if (pushK !== 0) {
+        // 진행파 복사압 (밀림). Y_p는 지름에만 의존하므로 무게 늘리기 중에도 그대로
+        samplePush(scene.field, pushK, x, z, push);
+        out.fx += push.fx;
+        out.fz += push.fz;
+      }
     },
   };
   setDensity(dyn, scene, rhoP);

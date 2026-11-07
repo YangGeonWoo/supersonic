@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import ControlPanel from './components/ControlPanel';
+import ControlPanel, { Slider } from './components/ControlPanel';
 import Legend from './components/Legend';
 import SideGraphs from './components/SideGraphs';
 import LateralPanel from './components3d/LateralPanel';
 import View3D, { type View3DOptions } from './components3d/View3D';
 import StatsPanel from './components/StatsPanel';
 import { defaultParams, type SimParams } from './physics/params';
+import { makeMedium } from './physics/acoustics';
+import { AMP_RATIO_SLIDER } from './state/sliders';
 import { useSimulation } from './state/useSimulation';
 import './index.css';
 
@@ -18,6 +20,8 @@ export default function App3D() {
   const sim = useSimulation(default3DParams);
   const { params, scene, simRef } = sim;
   const [view, setView] = useState<View3DOptions>({ planes: true, opacity: 0.85, nodes: true });
+  const halfLambda = makeMedium(params.f, params.T).lambda / 2;
+  const tooBig = params.ballDiameter > halfLambda;
 
   return (
     <div className="app">
@@ -49,8 +53,24 @@ export default function App3D() {
           onWeightTest={sim.onWeightTest}
           weightSpeed={sim.weightSpeed}
           onWeightSpeed={sim.onWeightSpeed}
+          forcesLabel="힘 화살표 (음향 방사력 + 중력 + 밀림)"
+          extraCore={
+            <>
+              <Slider s={AMP_RATIO_SLIDER} params={params} onChange={sim.onChange} />
+              <label className="check">
+                <input type="checkbox" checked={params.travelingForce} onChange={(e) => sim.setFlag('travelingForce', e.target.checked)} />
+                진행파 복사압 (밀림)
+              </label>
+            </>
+          }
         />
         <section className="view">
+          {tooBig && (
+            <div className="warn">
+              공 지름({(params.ballDiameter * 1e3).toFixed(1)} mm)이 반파장 λ/2({(halfLambda * 1e3).toFixed(1)} mm)보다 큽니다. Gor’kov 근사(작은
+              공)가 크게 어긋나는 영역이라 결과는 참고용입니다.
+            </div>
+          )}
           <View3D
             scene={scene}
             simRef={simRef}
@@ -86,7 +106,12 @@ export default function App3D() {
           </div>
           {sim.showForces && (
             <p className="arrow-key">
-              <span className="sw sw-acoustic" /> 음향 방사력 <span className="sw sw-gravity" /> 중력
+              <span className="sw sw-acoustic" /> 음향 방사력(합계) <span className="sw sw-gravity" /> 중력
+              {params.travelingForce && (
+                <>
+                  <span className="sw sw-push" /> 그중 밀림
+                </>
+              )}
             </p>
           )}
           <Legend mode={sim.mode} scene={scene} />
@@ -97,6 +122,12 @@ export default function App3D() {
           <LateralPanel scene={scene} simRef={simRef} />
         </div>
       </main>
+      <footer>
+        정량값이 아니라 경향을 보여주는 모델입니다. Gor’kov 근사는 공 지름이 파장(약 8.6 mm)보다 충분히 작을 때만 맞고(대략 4 mm
+        이하), 반사계수 R·감쇠비 ζ는 가정값입니다. 발생기 면에서 λ/8 이내는 계산하지 않습니다. 진행파 복사압은 강체 구 가정으로
+        정상파 항에 단순히 더한 근사입니다. 음향 유동, 비선형 효과, 발생기 기울어짐·어긋남은 다루지 않습니다. 장은 축대칭이라 x-z
+        단면 하나를 회전시켜 보여줍니다.
+      </footer>
     </div>
   );
 }

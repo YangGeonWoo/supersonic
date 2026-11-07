@@ -154,6 +154,9 @@ export interface FieldGrid {
   p2: Float32Array;
   /** |∇P|² */
   g2: Float32Array;
+  /** 음향 세기 I_x, I_z [W/m²] (s = 1 기준, 진행파 복사압용) */
+  Ix: Float32Array;
+  Iz: Float32Array;
 }
 
 export function computeFieldGrid(
@@ -180,8 +183,11 @@ export function computeFieldGrid(
     pIm: new Float32Array(N),
     p2: new Float32Array(N),
     g2: new Float32Array(N),
+    Ix: new Float32Array(N),
+    Iz: new Float32Array(N),
   };
   const f = newPointField();
+  const I = { x: 0, y: 0, z: 0 };
   for (let iz = 0; iz < nz; iz++) {
     const z = domain.zMin + iz * hz;
     for (let ix = 0; ix < nx; ix++) {
@@ -192,6 +198,9 @@ export function computeFieldGrid(
       grid.pIm[i] = f.pi;
       grid.p2[i] = absP2(f);
       grid.g2[i] = absGrad2(f);
+      intensityOf(f, med, I);
+      grid.Ix[i] = I.x;
+      grid.Iz[i] = I.z;
     }
   }
   return grid;
@@ -361,6 +370,8 @@ export interface AxisProfile {
   z: Float64Array;
   p2: Float64Array;
   g2: Float64Array;
+  /** 축 방향 음향 세기 [W/m²] (s = 1 기준) */
+  Iz: Float64Array;
 }
 
 export function computeAxisProfile(
@@ -378,7 +389,9 @@ export function computeAxisProfile(
     z: new Float64Array(n),
     p2: new Float64Array(n),
     g2: new Float64Array(n),
+    Iz: new Float64Array(n),
   };
+  const I = { x: 0, y: 0, z: 0 };
   const f = newPointField();
   for (let i = 0; i < n; i++) {
     const z = zMin + i * h;
@@ -386,6 +399,7 @@ export function computeAxisProfile(
     prof.z[i] = z;
     prof.p2[i] = absP2(f);
     prof.g2[i] = absGrad2(f);
+    prof.Iz[i] = intensityOf(f, med, I).z;
   }
   return prof;
 }
@@ -447,4 +461,33 @@ export function axisForce(z: Float64Array, U: ArrayLike<number>): Float64Array {
     F[i] = -(U[b] - U[a]) / (z[b] - z[a]);
   }
   return F;
+}
+
+/**
+ * 진행파 복사압 F = coeff·I (쌍선형 보간, 격자 밖 0). coeff = pushCoeff·s² (세기는 s = 1 기준이므로)
+ */
+export function samplePush(grid: FieldGrid, coeff: number, x: number, z: number, out: { fx: number; fz: number }): void {
+  const u = (x - grid.x0) / grid.hx;
+  const v = (z - grid.z0) / grid.hz;
+  if (coeff === 0 || !(u >= 0 && v >= 0 && u <= grid.nx - 1 && v <= grid.nz - 1)) {
+    out.fx = 0;
+    out.fz = 0;
+    return;
+  }
+  let i0 = Math.floor(u);
+  let j0 = Math.floor(v);
+  if (i0 >= grid.nx - 1) i0 = grid.nx - 2;
+  if (j0 >= grid.nz - 1) j0 = grid.nz - 2;
+  const tu = u - i0;
+  const tv = v - j0;
+  const a = j0 * grid.nx + i0;
+  const b = a + 1;
+  const c = a + grid.nx;
+  const e = c + 1;
+  const w00 = (1 - tu) * (1 - tv);
+  const w10 = tu * (1 - tv);
+  const w01 = (1 - tu) * tv;
+  const w11 = tu * tv;
+  out.fx = coeff * (w00 * grid.Ix[a] + w10 * grid.Ix[b] + w01 * grid.Ix[c] + w11 * grid.Ix[e]);
+  out.fz = coeff * (w00 * grid.Iz[a] + w10 * grid.Iz[b] + w01 * grid.Iz[c] + w11 * grid.Iz[e]);
 }

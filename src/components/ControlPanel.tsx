@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { SimParams } from '../physics/params';
 import { WEIGHT_SPEEDS, WEIGHT_TEST_SECONDS } from '../sim/ballSim';
 import { SLIDERS, type SliderDef } from '../state/sliders';
@@ -22,6 +23,10 @@ interface Props {
   onWeightTest: () => void;
   weightSpeed: number;
   onWeightSpeed: (s: number) => void;
+  /** 기본 조작 끝에 덧붙일 요소 (3D 페이지 전용 조작) */
+  extraCore?: ReactNode;
+  /** 힘 화살표 체크박스 문구 */
+  forcesLabel?: string;
 }
 
 /** 기본으로 보여줄 핵심 조작 */
@@ -33,7 +38,7 @@ const MODES: { id: DisplayMode; label: string }[] = [
   { id: 'instant', label: '순간 압력 Re P(t)' },
 ];
 
-function Slider({ s, params, onChange }: { s: SliderDef; params: SimParams; onChange: Props['onChange'] }) {
+export function Slider({ s, params, onChange }: { s: SliderDef; params: SimParams; onChange: Props['onChange'] }) {
   const ui = s.toUi(params[s.key]);
   return (
     <label className="slider">
@@ -105,9 +110,10 @@ export default function ControlPanel(p: Props) {
           const s = SLIDERS.find((v) => v.key === 'phi')!;
           return <Slider s={s} params={p.params} onChange={p.onChange} />;
         })()}
+        {p.extraCore}
         <label className="check">
           <input type="checkbox" checked={p.showForces} onChange={(e) => p.onShowForces(e.target.checked)} />
-          힘 화살표 (음향 방사력 + 중력)
+          {p.forcesLabel ?? '힘 화살표 (음향 방사력 + 중력)'}
         </label>
       </div>
 

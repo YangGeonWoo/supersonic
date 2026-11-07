@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { curve, fit, hline, label, nice, readColors, symRange, vline, type Box, type Colors } from '../components/SideGraphs';
 import type { LateralResult } from '../physics/lateral';
 import type { BallSim } from '../sim/ballSim';
-import { lateralFor, trapsOf } from '../sim/lateralScene';
+import { lateralFor, pushEffect, trapsOf } from '../sim/lateralScene';
 import type { Scene } from '../sim/scene';
 
 interface Props {
@@ -78,6 +78,7 @@ export default function LateralPanel({ scene, simRef }: Props) {
   const [zTrap, setZTrap] = useState<number | null>(null);
   const traps = useMemo(() => (scene ? trapsOf(scene) : []), [scene]);
   const result = useMemo(() => (scene && zTrap !== null ? lateralFor(scene, zTrap) : null), [scene, zTrap]);
+  const push = useMemo(() => (scene && zTrap !== null ? pushEffect(scene, zTrap) : null), [scene, zTrap]);
   const live = useRef({ traps, result });
   live.current = { traps, result };
 
@@ -119,8 +120,9 @@ export default function LateralPanel({ scene, simRef }: Props) {
     };
   }, [simRef]);
 
-  if (!result) return <div className="panel lateral">횡방향 계산 중…</div>;
+  if (!result || !scene) return <div className="panel lateral">횡방향 계산 중…</div>;
   const ok = result.stable;
+  const pushOn = scene.pushCoeff > 0;
   return (
     <div className="panel lateral">
       <div className={`status ${ok ? 'status-levitating' : 'status-moving'}`}>
@@ -151,6 +153,41 @@ export default function LateralPanel({ scene, simRef }: Props) {
           ? '축에서 조금 밀려도 다시 축으로 돌아옵니다. 다만 축 방향보다 훨씬 약하게 붙잡혀 있어 옆으로 흔들리기 쉽습니다.'
           : `축 위에서는 공을 바깥으로 밉니다. 공은 축에서 약 ${result.ringRadius !== null ? (result.ringRadius * 1e3).toFixed(1) : '?'} mm 떨어진 곳(점선, 실제로는 고리 모양)에 머물거나 빠져나갈 수 있습니다.`}
       </small>
+
+      <div className="card push-card">
+        <div className="card-title">밀림 효과 (진행파 복사압)</div>
+        {pushOn && push ? (
+          <dl>
+            <div className="stat">
+              <dt>평형 위치 이동</dt>
+              <dd>
+                {push.shift !== null ? `${push.shift >= 0 ? '+' : '−'}${Math.abs(push.shift * 1e3).toFixed(3)} mm` : '—'}
+                <small>{push.shift !== null ? (push.shift >= 0 ? '위쪽으로' : '아래쪽으로') : '평형점 없음'} (밀림이 없을 때 대비)</small>
+              </dd>
+            </div>
+            <div className="stat">
+              <dt>밀림 힘 / 무게</dt>
+              <dd>
+                {(push.push / scene.weight).toFixed(2)}
+                <small>공 위치의 축 방향 밀림 (위 +)</small>
+              </dd>
+            </div>
+            <div className="stat">
+              <dt>복사력 함수 Y_p</dt>
+              <dd>
+                {scene.Yp.toFixed(3)}
+                <small>ka = {(scene.med.k * scene.particle.a).toFixed(2)}, 강체 구</small>
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          <small className="note">꺼져 있습니다. 켜면 소리 에너지가 흐르는 방향(I)으로 공을 미는 힘 F = Y_p·πa²·I/c를 더합니다.</small>
+        )}
+        <small className="note">
+          두 발생기 출력이 같아도 구면파가 퍼지며 약해지므로 공은 가운데 쪽으로 조금 밀립니다. 위 발생기 출력을 줄이면 위(약한 쪽)로
+          밀리고, 많이 줄이면 바깥으로 흐르는 에너지 때문에 횡방향이 불안정해집니다.
+        </small>
+      </div>
     </div>
   );
 }

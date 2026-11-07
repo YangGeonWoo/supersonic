@@ -8,6 +8,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fieldToRGBA, type DisplayMode } from '../components/heatmap';
+import { samplePush } from '../physics/field2d';
 import type { BallSim, BallStatus } from '../sim/ballSim';
 import type { Scene } from '../sim/scene';
 import { stepBall } from '../state/useSimulation';
@@ -115,7 +116,9 @@ export default function View3D(props: Props) {
     // 힘 화살표 (공에 작용): 음향 방사력, 중력
     const arrowAcoustic = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0x22d3ee, 1.6, 1);
     const arrowGravity = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(), 1, 0xf87171, 1.6, 1);
-    scene3.add(arrowAcoustic, arrowGravity);
+    const arrowPush = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0xfde047, 1.6, 1);
+    scene3.add(arrowAcoustic, arrowGravity, arrowPush);
+    const pushF = { fx: 0, fz: 0 };
 
     let built: Scene | null = null;
     let paintedMode: DisplayMode | null = null;
@@ -208,7 +211,7 @@ export default function View3D(props: Props) {
 
         const sim = simRef.current;
         ball.visible = !!sim;
-        arrowAcoustic.visible = arrowGravity.visible = false;
+        arrowAcoustic.visible = arrowGravity.visible = arrowPush.visible = false;
         if (sim) {
           const st = sim.state;
           const a = sc.particle.a * MM;
@@ -224,6 +227,18 @@ export default function View3D(props: Props) {
               const L = a + arrowLen(fa, fRef);
               arrowAcoustic.setLength(L, Math.min(1.6, L * 0.4), Math.min(1, L * 0.25));
               arrowAcoustic.visible = true;
+            }
+            // 밀림 성분 (음향 방사력 화살표에 이미 포함된 것을 따로 보여줌)
+            if (sc.pushCoeff > 0) {
+              samplePush(sc.field, sc.pushCoeff * sc.s * sc.s, st.x, st.z, pushF);
+              const fp = Math.hypot(pushF.fx, pushF.fz);
+              if (fp > 0) {
+                arrowPush.position.copy(ball.position);
+                arrowPush.setDirection(new THREE.Vector3(pushF.fx / fp, pushF.fz / fp, 0));
+                const Lp = a + arrowLen(fp, fRef);
+                arrowPush.setLength(Lp, Math.min(1.6, Lp * 0.4), Math.min(1, Lp * 0.25));
+                arrowPush.visible = true;
+              }
             }
             const fg = sim.dyn.m * sim.dyn.g;
             arrowGravity.position.copy(ball.position);

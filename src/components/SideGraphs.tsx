@@ -143,7 +143,7 @@ function drawAxisGraph(canvas: HTMLCanvasElement, sc: Scene, ballZ: number | nul
 
   const zs = sc.axis.z;
   const U = sc.axisU;
-  const F = sc.axisF;
+  const F = sc.axisFz; // Gor'kov + 밀림 (밀림이 꺼져 있으면 axisF와 같음)
   const uMax = symRange(U);
   const fMax = symRange(F, sc.weight);
   const Yu = (v: number) => bu.y + bu.h / 2 - (v / uMax) * (bu.h / 2);

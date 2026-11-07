@@ -30,6 +30,21 @@ const id = (v: number) => v;
 const mmIn = (v: number) => v * 1e3;
 const mmOut = (v: number) => v / 1e3;
 
+/** 3D 페이지 전용: 위 발생기 진폭비 (2D 화면에는 나오지 않음) */
+export const AMP_RATIO_SLIDER: SliderDef = {
+  key: 'ampRatio',
+  label: '위 발생기 출력 (아래 대비)',
+  unit: '×',
+  min: 0,
+  max: 1,
+  step: 0.01,
+  toUi: (v) => v,
+  fromUi: (v) => v,
+  digits: 2,
+  heavy: true,
+  group: '음향',
+};
+
 export const SLIDERS: SliderDef[] = [
   { key: 'f', label: '주파수 f', unit: 'kHz', min: 38, max: 42, step: 0.05, toUi: (v) => v / 1e3, fromUi: (v) => v * 1e3, digits: 2, heavy: true, group: '음향' },
   { key: 'T', label: '온도 T', unit: '°C', min: 0, max: 40, step: 0.5, toUi: id, fromUi: id, digits: 1, heavy: true, group: '음향' },

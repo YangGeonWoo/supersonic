@@ -221,7 +221,7 @@ describe('검증 5 (B층): 구동 세기 2배 → U 4배', () => {
 });
 
 function axisPotentialAt(p2: number, g2: number, s: number): number {
-  const prof = { z: Float64Array.of(0), p2: Float64Array.of(p2), g2: Float64Array.of(g2) };
+  const prof = { z: Float64Array.of(0), p2: Float64Array.of(p2), g2: Float64Array.of(g2), Iz: Float64Array.of(0) };
   return axisPotential(prof, med, particle, s * s)[0];
 }
 

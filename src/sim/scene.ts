@@ -25,6 +25,7 @@ import { makeParticle, maxForce, nodes1D, stiffness, type Particle } from '../ph
 import { dampingCoeff, oscillationPeriod, timeStep } from '../physics/integrator';
 import type { SimParams } from '../physics/params';
 import { resonanceGain } from '../physics/resonance';
+import { pushCoefficient, radiationForceFunction } from '../physics/scattering';
 import { makeSourceSet, sampleDisc, type DiscSample, type SourceSet } from '../physics/sourceSampling';
 
 /** 음향장(1단계)을 정하는 변수 */
@@ -35,14 +36,16 @@ export interface FieldParams {
   at: number;
   phi: number;
   directivity: boolean;
+  /** 위 발생기 진폭비 */
+  ampRatio: number;
 }
 
 export function fieldParamsOf(p: SimParams): FieldParams {
-  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity };
+  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity, ampRatio: p.ampRatio };
 }
 
 export function sameFieldParams(a: FieldParams, b: FieldParams): boolean {
-  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity;
+  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity && a.ampRatio === b.ampRatio;
 }
 
 /** 1단계 결과 (structured clone 가능한 순수 데이터) */
@@ -83,6 +86,14 @@ export interface Scene extends FieldData {
   /** 축 위 U(z) [J], F_z(z) [N] (실제 세기, axis.z와 같은 샘플) */
   axisU: Float64Array;
   axisF: Float64Array;
+  /** 진행파 복사압 함수 Y_p(ka) (강체 구) */
+  Yp: number;
+  /** 진행파 복사압 계수 Y_p·π a²/c (travelingForce가 꺼져 있으면 0) */
+  pushCoeff: number;
+  /** 축 위 밀림 힘 F_z,push [N] */
+  axisFpush: Float64Array;
+  /** 축 위 F_z 합계 = axisF + axisFpush [N] */
+  axisFz: Float64Array;
 }
 
 /** 원판 샘플 재사용 (a_t, λ가 같으면 같은 좌표) */
@@ -102,7 +113,7 @@ export function buildField(fp: FieldParams): FieldData {
   const t0 = now();
   const med = makeMedium(fp.f, fp.T);
   const domain = computeDomain(fp.d, med.lambda);
-  const sources = makeSourceSet(getDisc(fp.at, med.lambda), fp.d, fp.phi);
+  const sources = makeSourceSet(getDisc(fp.at, med.lambda), fp.d, fp.phi, fp.ampRatio);
   const field = computeFieldGrid(sources, med, domain, fp.directivity);
   const axis = computeAxisProfile(sources, med, domain.zMin, domain.zMax, fp.directivity);
   return { fp, med, domain, sources, field, axis, computeMs: now() - t0 };
@@ -118,6 +129,15 @@ export function finishScene(fd: FieldData, input: SimParams, cal: Calibration): 
   const Fmax = maxForce(P0, med, particle);
   const kappa = stiffness(P0, med, particle);
   const axisU = axisPotential(fd.axis, med, particle, s * s);
+  const axisF = axisForce(fd.axis.z, axisU);
+  const Yp = radiationForceFunction(med.k * particle.a);
+  const pushCoeff = params.travelingForce ? pushCoefficient(particle.a, med.k, med.c) : 0;
+  const axisFpush = new Float64Array(axisF.length);
+  const axisFz = new Float64Array(axisF.length);
+  for (let i = 0; i < axisF.length; i++) {
+    axisFpush[i] = pushCoeff * s * s * fd.axis.Iz[i];
+    axisFz[i] = axisF[i] + axisFpush[i];
+  }
   return {
     ...fd,
     params,
@@ -136,7 +156,11 @@ export function finishScene(fd: FieldData, input: SimParams, cal: Calibration): 
     nodesA: nodes1D(params.d, params.phi, med.lambda, fd.domain.zMin, fd.domain.zMax),
     nodesB: axisPressureNodes(fd.axis),
     axisU,
-    axisF: axisForce(fd.axis.z, axisU),
+    axisF,
+    Yp,
+    pushCoeff,
+    axisFpush,
+    axisFz,
   };
 }
 

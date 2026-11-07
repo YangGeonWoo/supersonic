@@ -52,10 +52,10 @@ export interface SourceSet {
 }
 
 /**
- * 아래 발생기(z = 0, 위상 0)와 위 발생기(z = d, 위상 φ).
+ * 아래 발생기(z = 0, 위상 0)와 위 발생기(z = d, 위상 φ, 진폭 배율 ampUpper).
  * 원판 샘플(disc)은 한 번 만들어 재사용할 수 있게 인자로 받는다.
  */
-export function makeSourceSet(disc: DiscSample, d: number, phi: number): SourceSet {
+export function makeSourceSet(disc: DiscSample, d: number, phi: number, ampUpper = 1): SourceSet {
   const m = disc.x.length;
   const n = 2 * m;
   const set: SourceSet = {
@@ -81,8 +81,8 @@ export function makeSourceSet(disc: DiscSample, d: number, phi: number): SourceS
     set.x[t] = disc.x[j];
     set.y[t] = disc.y[j];
     set.z[t] = d;
-    set.cRe[t] = disc.area[j] * cp;
-    set.cIm[t] = disc.area[j] * sp;
+    set.cRe[t] = ampUpper * disc.area[j] * cp;
+    set.cIm[t] = ampUpper * disc.area[j] * sp;
     set.side[t] = -1;
   }
   return set;

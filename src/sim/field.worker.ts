@@ -25,8 +25,11 @@ ctx.onmessage = (e: MessageEvent<FieldRequest>) => {
     fd.field.pIm.buffer,
     fd.field.p2.buffer,
     fd.field.g2.buffer,
+    fd.field.Ix.buffer,
+    fd.field.Iz.buffer,
     fd.axis.z.buffer,
     fd.axis.p2.buffer,
     fd.axis.g2.buffer,
+    fd.axis.Iz.buffer,
   ]);
 };
