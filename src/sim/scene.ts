@@ -49,14 +49,17 @@ export interface FieldParams {
   ampRatio: number;
   /** 거울상 반사의 반사계수 (0이면 거울상 없음 → G(d) 배율 모델) */
   imageR: number;
+  /** 위 발생기 기울기 [rad], 어긋남 [m] */
+  tilt: number;
+  offset: number;
 }
 
 export function fieldParamsOf(p: SimParams): FieldParams {
-  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity, ampRatio: p.ampRatio, imageR: p.reflections ? p.R : 0 };
+  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity, ampRatio: p.ampRatio, imageR: p.reflections ? p.R : 0, tilt: p.tilt, offset: p.offset };
 }
 
 export function sameFieldParams(a: FieldParams, b: FieldParams): boolean {
-  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity && a.ampRatio === b.ampRatio && a.imageR === b.imageR;
+  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity && a.ampRatio === b.ampRatio && a.imageR === b.imageR && a.tilt === b.tilt && a.offset === b.offset;
 }
 
 /** 1단계 결과 (structured clone 가능한 순수 데이터) */
@@ -127,15 +130,22 @@ function getDisc(at: number, lambda: number): DiscSample {
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
+/** 장 변수로 점음원(거울상 포함) 만들기 — CPU 장 계산과 GPU 장 계산이 같은 점음원을 쓴다 */
+export function makeSources(fp: FieldParams, lambda: number): SourceSet {
+  const pose = { tilt: fp.tilt ?? 0, offset: fp.offset ?? 0 };
+  let sources = makeSourceSet(getDisc(fp.at, lambda), fp.d, fp.phi, fp.ampRatio, pose);
+  if (fp.imageR > 0) {
+    const far = makeSourceSet(sampleDisc(fp.at, lambda * FAR_IMAGE_SPACING_FRACTION), fp.d, fp.phi, fp.ampRatio, pose);
+    sources = withReflections(sources, far, fp.d, fp.imageR, reflectionOrders(fp.imageR), pose);
+  }
+  return sources;
+}
+
 export function buildField(fp: FieldParams): FieldData {
   const t0 = now();
   const med = makeMedium(fp.f, fp.T);
   const domain = computeDomain(fp.d, med.lambda);
-  let sources = makeSourceSet(getDisc(fp.at, med.lambda), fp.d, fp.phi, fp.ampRatio);
-  if (fp.imageR > 0) {
-    const far = makeSourceSet(sampleDisc(fp.at, med.lambda * FAR_IMAGE_SPACING_FRACTION), fp.d, fp.phi, fp.ampRatio);
-    sources = withReflections(sources, far, fp.d, fp.imageR, reflectionOrders(fp.imageR));
-  }
+  const sources = makeSources(fp, med.lambda);
   const field = computeFieldGrid(sources, med, domain, fp.directivity);
   const axis = computeAxisProfile(sources, med, domain.zMin, domain.zMax, fp.directivity);
   return { fp, med, domain, sources, field, axis, computeMs: now() - t0 };

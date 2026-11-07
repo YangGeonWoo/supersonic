@@ -26,8 +26,8 @@ export function newPointField(): PointField {
 
 /**
  * 점 (x, y, z)에서 모든 점음원의 합 P와 ∇P (해석적).
- * ∇P_j = P_j·(ik − 1/R)·(r − r_j)/R. 지향성 D = (1 + side·Δz/R)/2를 쓰면
- * ∇(D·P_j) = D·∇P_j + P_j·∇D, ∇D = (side/2)·(ẑ/R − Δz·(r − r_j)/R³).
+ * ∇P_j = P_j·(ik − 1/R)·(r − r_j)/R. 지향성 D = (1 + n_j·Δ/R)/2를 쓰면 (n_j: 점음원 방사 방향)
+ * ∇(D·P_j) = D·∇P_j + P_j·∇D, ∇D = (n_j/R − (n_j·Δ)·Δ/R³)/2.
  */
 export function evalField(
   src: SourceSet,
@@ -65,12 +65,16 @@ export function evalField(
     let ay = qr * dy, ayi = qi * dy;
     let az = qr * dz, azi = qi * dz;
     if (directivity) {
-      const s = src.side[j];
-      const D = 0.5 * (1 + s * dz * invR);
+      // D = (1 + n·Δ/R)/2,  ∇D = (n/R − (n·Δ)Δ/R³)/2   (n: 점음원 방사 방향 단위 법선)
+      const nx = src.nx[j];
+      const ny = src.ny[j];
+      const nz = src.nz[j];
+      const nd = nx * dx + ny * dy + nz * dz;
+      const D = 0.5 * (1 + nd * invR);
       const invR3 = invR * invR * invR;
-      const hx = 0.5 * s * (-dz * dx * invR3);
-      const hy = 0.5 * s * (-dz * dy * invR3);
-      const hz = 0.5 * s * (invR - dz * dz * invR3);
+      const hx = 0.5 * (nx * invR - nd * dx * invR3);
+      const hy = 0.5 * (ny * invR - nd * dy * invR3);
+      const hz = 0.5 * (nz * invR - nd * dz * invR3);
       ax = D * ax + Pr * hx;
       axi = D * axi + Pi * hx;
       ay = D * ay + Pr * hy;

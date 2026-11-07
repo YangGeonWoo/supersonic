@@ -27,7 +27,10 @@ describe('음향 세기 벡터', () => {
       z: Float64Array.of(0),
       cRe: Float64Array.of(1),
       cIm: Float64Array.of(0),
-      side: Float64Array.of(1),
+      side: Int8Array.of(1),
+      nx: Float64Array.of(0),
+      ny: Float64Array.of(0),
+      nz: Float64Array.of(1),
     } as unknown as SourceSet;
     const f = newPointField();
     const I = { x: 0, y: 0, z: 0 };

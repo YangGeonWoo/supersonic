@@ -47,6 +47,10 @@ export interface SimParams {
    * false면 SPEC 2.3의 공진 이득 배율 G(d)를 쓴다.
    */
   reflections: boolean;
+  /** 위 발생기 기울기 [rad] (x축 둘레, 3D GPU 모드 전용 — 조립 오차) */
+  tilt: number;
+  /** 위 발생기 x 방향 어긋남 [m] (3D GPU 모드 전용) */
+  offset: number;
 }
 
 /** 기본 조건의 간격 d = 5·λ/2 [m] */
@@ -72,5 +76,7 @@ export function defaultParams(): SimParams {
     ampRatio: 1,
     travelingForce: false,
     reflections: false,
+    tilt: 0,
+    offset: 0,
   };
 }
