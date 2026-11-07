@@ -618,3 +618,43 @@ button.snap small {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* GPU 3D 격자 모드 */
+fieldset.compute-mode,
+fieldset.pose {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0 4px;
+  padding: 6px 0 0;
+}
+fieldset.pose:disabled {
+  opacity: 0.55;
+}
+.pose-note {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: -4px;
+}
+.tool-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.tool-select select {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+}
+.tool-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.selftest dd {
+  font-size: 12px;
+}

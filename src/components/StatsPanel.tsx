@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { ASSUMED_P0_REF } from '../physics/constants';
-import { marginAt, STATUS_LABEL, theoreticalLimitDensity, type BallSim, type BallStatus } from '../sim/ballSim';
+import { marginAt, STATUS_LABEL, theoreticalLimitDensity, type BallStatus, type WeightTest } from '../sim/ballSim';
 import { fieldLimitDensity, fieldMargin, trapNear } from '../sim/limits';
 import type { Scene } from '../sim/scene';
+
+/** 상태 칸이 읽는 공의 값 (2D BallSim, 3D BallSim3 모두) */
+export interface BallView {
+  state: { x: number; y?: number; z: number };
+  test: WeightTest | null;
+  readonly density: number;
+  readonly mass: number;
+}
 
 interface Props {
   scene: Scene | null;
   status: BallStatus;
   busy: boolean;
-  simRef: MutableRefObject<BallSim | null>;
+  simRef: MutableRefObject<BallView | null>;
+  /** GPU 3D 격자 모드: 3D 격자 기준 한계·힘 여유 (없으면 2D 장 기준) */
+  limitsFor?: ((ball: { x: number; y?: number; z: number }, rhoP: number) => { rhoLimit: number; margin: number } | null) | null;
   /** 3D 페이지: 공이 있는 덫의 횡방향 판정 (κ_ρ ≤ 0이면 true). 2D는 생략 */
   lateralUnstable?: boolean;
 }
@@ -31,8 +41,8 @@ function Row({ k, v, hint }: { k: string; v: string; hint?: string }) {
 }
 
 /** 공 무게와 무게 테스트 진행 (10 Hz로 simRef를 읽는다 — 매 프레임 React 상태를 바꾸지 않음) */
-function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
-  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0, z: NaN, rhoLimitTest: NaN });
+function useBallSnapshot(simRef: MutableRefObject<BallView | null>) {
+  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0, y: 0, z: NaN, rhoLimitTest: NaN });
   useEffect(() => {
     const id = setInterval(() => {
       const sim = simRef.current;
@@ -45,6 +55,7 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
         elapsed: t?.elapsedFall ?? t?.elapsed ?? 0,
         speed: t?.speed ?? 1,
         x: sim.state.x,
+        y: sim.state.y ?? 0,
         z: sim.state.z,
         // 무게 늘리기를 시작할 때 공이 있던 덫의 한계 (떨어진 뒤 공 위치로 다시 구하면 다른 덫이 됨)
         rhoLimitTest: t?.rhoLimit ?? NaN,
@@ -58,7 +69,7 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
   return snap;
 }
 
-export default function StatsPanel({ scene, status, busy, simRef, lateralUnstable }: Props) {
+export default function StatsPanel({ scene, status, busy, simRef, lateralUnstable, limitsFor }: Props) {
   const snap = useBallSnapshot(simRef);
   // 공이 있는 덫 (없으면 가운데 쪽). 한계는 2D 장 기준 — 덫·장면이 바뀔 때만 다시 계산
   const zTrap = scene ? trapNear(scene, Number.isFinite(snap.z) ? snap.z : scene.params.d / 2) : null;
@@ -68,9 +79,10 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
 
   const rho = Number.isFinite(snap.rho) ? snap.rho : particle.rhoP;
   const mass = Number.isFinite(snap.mass) ? snap.mass : particle.m;
-  const margin = zTrap !== null ? fieldMargin(scene, zTrap, rho) : marginAt(scene, rho);
+  const lim3 = limitsFor && Number.isFinite(snap.z) ? limitsFor({ x: snap.x, y: snap.y, z: snap.z }, rho) : null;
+  const margin = lim3 ? lim3.margin : zTrap !== null ? fieldMargin(scene, zTrap, rho) : marginAt(scene, rho);
   const rhoAnalytic = theoreticalLimitDensity(scene);
-  const rhoLimit = Number.isFinite(rhoField) ? rhoField : rhoAnalytic;
+  const rhoLimit = lim3 ? lim3.rhoLimit : Number.isFinite(rhoField) ? rhoField : rhoAnalytic;
   const massLimit = rhoLimit * particle.V;
   const frac = Math.min(1, mass / massLimit);
 
@@ -78,7 +90,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
     <div className="panel stats">
       {(() => {
         // 부양 중이라도 축 밖에 있거나 횡방향이 불안정하면 한 칸에서 같이 알린다
-        const offAxis = status === 'levitating' && Math.abs(snap.x) > OFF_AXIS;
+        const offAxis = status === 'levitating' && !limitsFor && Math.hypot(snap.x, snap.y) > OFF_AXIS;
         const lateral = status === 'levitating' && !!lateralUnstable;
         const caution = offAxis || lateral;
         const label = !caution ? STATUS_LABEL[status] : offAxis ? '부양 (축 밖)' : '부양 (옆으로 불안정)';
@@ -107,7 +119,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
           </div>
           <div className="right">
             <div className="big">{mgOf(massLimit)}</div>
-            <small>부양 한계 (2D 장 기준)</small>
+            <small>부양 한계 ({limitsFor ? '3D 격자' : '2D 장'} 기준)</small>
           </div>
         </div>
         <div className="meter" aria-label="부양 한계 대비 현재 무게">

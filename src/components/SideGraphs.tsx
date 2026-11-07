@@ -5,13 +5,14 @@
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { drivenPairGain, resonanceCurve } from '../physics/resonance';
-import type { BallSim } from '../sim/ballSim';
+
 import type { Scene } from '../sim/scene';
 import { SLIDERS } from '../state/sliders';
 
 interface Props {
   scene: Scene | null;
-  simRef: MutableRefObject<BallSim | null>;
+  /** 공의 높이만 읽는다 (2D·3D 공 모두) */
+  simRef: MutableRefObject<{ state: { z: number } } | null>;
 }
 
 const D_RANGE = (() => {

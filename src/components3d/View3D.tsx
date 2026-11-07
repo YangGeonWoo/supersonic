@@ -1,14 +1,20 @@
 /**
- * 3D 뷰 (Three.js). 단위: 1 = 1 mm. 좌표 대응: 물리 (x, y, z) → Three (x, z, y) (물리 z = 화면 위쪽)
+ * 3D 뷰 (Three.js). 단위: 1 = 1 mm. 물리 z = 화면 위쪽.
  *
- * 장은 축대칭이라 x-z 격자(= (ρ, z) 반평면 결과)를 x-z, y-z 두 단면에 같은 텍스처로 세운다.
- * 공의 위치/속도는 simRef에 있고 rAF 루프에서 stepBall로 진행한다 (React 상태 아님).
+ * 두 가지 계산 방식을 그린다.
+ *  - 축대칭 CPU: x-z 격자(= (ρ, z) 반평면 결과)를 x-z, y-z 두 단면에 같은 텍스처로 세운다.
+ *  - GPU 3D 격자: 3D 텍스처를 단면 3장·볼륨·덫 등치면 셰이더로 (gpuVisuals.ts). 좌표 Three (X, Y, Z) = 물리 (x, z, −y).
+ * 공의 위치/속도는 simRef(또는 sim3Ref)에 있고 rAF 루프에서 진행한다 (React 상태 아님).
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fieldToRGBA, type DisplayMode } from '../components/heatmap';
 import { samplePush } from '../physics/field2d';
+import { forceAt, makeForceModel } from '../physics/force3';
+import type { BallSim3 } from '../sim/ballSim3';
+import type { Scene3 } from '../sim/scene3';
+import { GpuVisuals, type GpuViewOptions } from './gpuVisuals';
 import type { BallSim, BallStatus } from '../sim/ballSim';
 import type { Scene } from '../sim/scene';
 import { stepBall } from '../state/useSimulation';
@@ -31,6 +37,13 @@ interface Props {
   timeScale: number;
   onStatus: (s: BallStatus) => void;
   options: View3DOptions;
+  /** GPU 3D 격자 모드 (scene3가 있으면 이 경로로 그린다) */
+  gpu?: {
+    scene3: Scene3 | null;
+    sim3Ref: MutableRefObject<BallSim3 | null>;
+    onStatus3: (s: BallStatus) => void;
+    options: GpuViewOptions;
+  } | null;
 }
 
 const MM = 1e3;
@@ -66,8 +79,8 @@ export default function View3D(props: Props) {
     renderer.domElement.setAttribute('role', 'img');
     renderer.domElement.tabIndex = 0; // 키보드로 조작할 수 있게
 
-    const scene3 = new THREE.Scene();
-    const setBg = () => (scene3.background = new THREE.Color(cssVar('--canvas-bg', '#0d1117')));
+    const world = new THREE.Scene();
+    const setBg = () => (world.background = new THREE.Color(cssVar('--canvas-bg', '#0d1117')));
     setBg();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener('change', setBg);
@@ -77,10 +90,10 @@ export default function View3D(props: Props) {
     controls.enableDamping = true;
     controls.target.set(0, 11, 0);
 
-    scene3.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.6));
+    world.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(30, 60, 40);
-    scene3.add(sun);
+    world.add(sun);
 
     // 발생기 (단위 원기둥을 a_t로 키움)
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, metalness: 0.3, roughness: 0.6 });
@@ -88,12 +101,12 @@ export default function View3D(props: Props) {
     const cyl = new THREE.CylinderGeometry(1, 1, 1, 48);
     const lower = new THREE.Mesh(cyl, [bodyMat, faceMat, bodyMat]); // 옆, 윗면, 아랫면
     const upper = new THREE.Mesh(cyl, [bodyMat, bodyMat, faceMat]);
-    scene3.add(lower, upper);
+    world.add(lower, upper);
 
     // 축
     const axisGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)]);
     const axis = new THREE.Line(axisGeom, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
-    scene3.add(axis);
+    world.add(axis);
 
     // 단면 2개 (같은 텍스처). 텍스처 행 0 = 위쪽이므로 v를 뒤집는다
     let tex: THREE.DataTexture | null = null;
@@ -103,7 +116,7 @@ export default function View3D(props: Props) {
     const planeXZ = new THREE.Mesh(planeGeom, planeMat);
     const planeYZ = new THREE.Mesh(planeGeom, planeMat);
     planeYZ.rotation.y = Math.PI / 2;
-    scene3.add(planeXZ, planeYZ);
+    world.add(planeXZ, planeYZ);
 
     // 마디 면 (반투명 원판)
     const nodeGroup = new THREE.Group();
@@ -113,7 +126,7 @@ export default function View3D(props: Props) {
     const ring = new THREE.BufferGeometry().setFromPoints(
       Array.from({ length: 65 }, (_, i) => new THREE.Vector3(Math.cos((i / 64) * 2 * Math.PI), 0, Math.sin((i / 64) * 2 * Math.PI))),
     );
-    scene3.add(nodeGroup);
+    world.add(nodeGroup);
 
     // 공
     // 공과 화살표는 반투명 단면 뒤에 그려 단면에 가려지지 않게 한다
@@ -123,13 +136,13 @@ export default function View3D(props: Props) {
       new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, transparent: true, opacity: 1 }),
     );
     ball.renderOrder = 10;
-    scene3.add(ball);
+    world.add(ball);
 
     // 힘 화살표 (공에 작용): 음향 방사력, 중력
     const arrowAcoustic = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0x22d3ee, 1.6, 1);
     const arrowGravity = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(), 1, 0xf87171, 1.6, 1);
     const arrowPush = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0xfde047, 1.6, 1);
-    scene3.add(arrowAcoustic, arrowGravity, arrowPush);
+    world.add(arrowAcoustic, arrowGravity, arrowPush);
     for (const a of [arrowAcoustic, arrowGravity, arrowPush]) {
       a.renderOrder = 11;
       a.traverse((o) => {
@@ -176,6 +189,14 @@ export default function View3D(props: Props) {
     let fpsFrames = 0;
     let fpsT0 = performance.now();
     const pushF = { fx: 0, fz: 0 };
+    // GPU 3D 격자 표시
+    const vis = new GpuVisuals(renderer);
+    vis.group.visible = false;
+    world.add(vis.group);
+    const last3 = { status: null as BallStatus | null };
+    const f3 = { fx: 0, fy: 0, fz: 0 };
+    const p3 = { fx: 0, fy: 0, fz: 0 };
+    let builtGpuD = -1;
 
     let built: Scene | null = null;
     let paintedMode: DisplayMode | null = null;
@@ -257,7 +278,17 @@ export default function View3D(props: Props) {
       }
       const realDt = Math.min(0.1, (tNow - lastT) / 1000);
       lastT = tNow;
-      const { scene: sc, simRef, mode, animate, showForces, timeScale, onStatus, options } = live.current;
+      const { scene: sc, simRef, mode, animate, showForces, timeScale, onStatus, options, gpu } = live.current;
+      const sc3 = gpu?.scene3 ?? null;
+      vis.group.visible = !!sc3;
+      if (gpu && sc3) {
+        drawGpu(sc3, gpu, mode, animate, showForces, timeScale, realDt, tNow);
+        controls.update();
+        renderer.render(world, camera);
+        return;
+      }
+      upper.rotation.x = 0;
+      axis.visible = true;
       stepBall(simRef, realDt, timeScale, sc, last, onStatus);
 
       if (sc) {
@@ -313,11 +344,91 @@ export default function View3D(props: Props) {
         }
       }
       controls.update();
-      renderer.render(scene3, camera);
+      renderer.render(world, camera);
     };
+    /** GPU 3D 격자 모드 한 프레임 */
+    const drawGpu = (
+      sc3: Scene3,
+      gpu: NonNullable<Props['gpu']>,
+      mode: DisplayMode,
+      animate: boolean,
+      showForces: boolean,
+      timeScale: number,
+      realDt: number,
+      tNow: number,
+    ) => {
+      const sim = gpu.sim3Ref.current;
+      if (sim) {
+        sim.advanceFrame(realDt, timeScale, sc3);
+        if (sim.status !== last3.status) {
+          last3.status = sim.status;
+          gpu.onStatus3(sim.status);
+        }
+      }
+      // CPU 표시는 숨김
+      planeXZ.visible = planeYZ.visible = false;
+      nodeGroup.visible = false;
+      axis.visible = false;
+
+      // 발생기: 위 발생기는 기울기 θ(x축 둘레)와 x 어긋남
+      const p = sc3.params;
+      const d = p.d * MM;
+      const at = p.at * MM;
+      lower.scale.set(at, BODY, at);
+      lower.position.set(0, -BODY / 2, 0);
+      upper.scale.set(at, BODY, at);
+      upper.rotation.x = p.tilt;
+      upper.position.set(p.offset * MM, d + (BODY / 2) * Math.cos(p.tilt), (BODY / 2) * Math.sin(p.tilt));
+      if (builtGpuD !== p.d) {
+        controls.target.set(0, d / 2, 0);
+        builtGpuD = p.d;
+      }
+
+      const phase = mode === 'instant' && animate ? 2 * Math.PI * (tNow / 1000) : 0;
+      vis.update(sc3, mode, phase, gpu.options);
+
+      ball.visible = !!sim;
+      arrowAcoustic.visible = arrowGravity.visible = arrowPush.visible = false;
+      if (!sim) return;
+      const st = sim.state;
+      const a = sc3.particle.a * MM;
+      ball.scale.setScalar(a);
+      ball.position.set(st.x * MM, st.z * MM, -st.y * MM);
+      if (!showForces || sim.status === 'escaped') return;
+      const fRef = Math.max(sc3.Fmax, sc3.weight, 1e-12);
+      sim.dyn.force(st.x, st.y, st.z, f3);
+      const fa = Math.hypot(f3.fx, f3.fy, f3.fz);
+      if (fa > 0) {
+        arrowAcoustic.position.copy(ball.position);
+        arrowAcoustic.setDirection(new THREE.Vector3(f3.fx / fa, f3.fz / fa, -f3.fy / fa));
+        const L = a + arrowLen(fa, fRef);
+        arrowAcoustic.setLength(L, Math.min(1.6, L * 0.4), Math.min(1, L * 0.25));
+        arrowAcoustic.visible = true;
+      }
+      if (sc3.pushCoeff > 0) {
+        // 밀림 성분만: Gor'kov 항을 뺀 모델(V = 0)로 계산
+        const pm = makeForceModel(sc3.grid, sc3.med, sc3.s * sc3.s, 0, 0, 0, sc3.pushCoeff);
+        forceAt(pm, st.x, st.y, st.z, p3);
+        const fp = Math.hypot(p3.fx, p3.fy, p3.fz);
+        if (fp > 0) {
+          arrowPush.position.copy(ball.position);
+          arrowPush.setDirection(new THREE.Vector3(p3.fx / fp, p3.fz / fp, -p3.fy / fp));
+          const Lp = a + arrowLen(fp, fRef);
+          arrowPush.setLength(Lp, Math.min(1.6, Lp * 0.4), Math.min(1, Lp * 0.25));
+          arrowPush.visible = true;
+        }
+      }
+      const fg = sim.dyn.m * sim.dyn.g;
+      arrowGravity.position.copy(ball.position);
+      const Lg = a + arrowLen(fg, fRef);
+      arrowGravity.setLength(Lg, Math.min(1.6, Lg * 0.4), Math.min(1, Lg * 0.25));
+      arrowGravity.visible = true;
+    };
+
     raf = requestAnimationFrame(frame);
 
     return () => {
+      vis.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();
       mq.removeEventListener('change', setBg);

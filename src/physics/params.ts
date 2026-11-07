@@ -51,6 +51,8 @@ export interface SimParams {
   tilt: number;
   /** 위 발생기 x 방향 어긋남 [m] (3D GPU 모드 전용) */
   offset: number;
+  /** 공을 놓는 방향 (덫에서 옆으로 0.5 mm 떨어진 방향의 방위각, x축 기준) [rad] (3D GPU 모드 전용) */
+  releaseAzimuth: number;
 }
 
 /** 기본 조건의 간격 d = 5·λ/2 [m] */
@@ -78,5 +80,6 @@ export function defaultParams(): SimParams {
     reflections: false,
     tilt: 0,
     offset: 0,
+    releaseAzimuth: 0,
   };
 }

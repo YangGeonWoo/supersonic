@@ -45,6 +45,15 @@ export const AMP_RATIO_SLIDER: SliderDef = {
   group: '음향',
 };
 
+const deg = { toUi: (v: number) => (v * 180) / Math.PI, fromUi: (v: number) => (v * Math.PI) / 180 };
+
+/** 3D GPU 모드 전용: 위 발생기 기울기·어긋남(조립 오차), 공 놓는 방향 */
+export const POSE_SLIDERS: SliderDef[] = [
+  { key: 'tilt', label: '위 발생기 기울기 (x축 둘레)', unit: '°', min: 0, max: 6, step: 0.1, ...deg, digits: 1, heavy: true, group: '음향' },
+  { key: 'offset', label: '위 발생기 옆 어긋남 (x)', unit: 'mm', min: 0, max: 3, step: 0.05, toUi: (v) => v * 1e3, fromUi: (v) => v / 1e3, digits: 2, heavy: true, group: '음향' },
+  { key: 'releaseAzimuth', label: '공 놓는 방향', unit: '°', min: 0, max: 359, step: 1, ...deg, digits: 0, group: '공' },
+];
+
 export const SLIDERS: SliderDef[] = [
   { key: 'f', label: '주파수 f', unit: 'kHz', min: 38, max: 42, step: 0.05, toUi: (v) => v / 1e3, fromUi: (v) => v * 1e3, digits: 2, heavy: true, group: '음향' },
   { key: 'T', label: '온도 T', unit: '°C', min: 0, max: 40, step: 0.5, toUi: id, fromUi: id, digits: 1, heavy: true, group: '음향' },
