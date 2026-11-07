@@ -428,8 +428,12 @@ button.snap small {
   gap: 8px;
   font-size: 13px;
 }
+.seg-row {
+  flex-wrap: wrap;
+}
 .seg-row > span {
   color: var(--muted);
+  white-space: nowrap;
 }
 .seg-row small {
   color: var(--muted);
@@ -458,4 +462,22 @@ button.snap small {
   background: var(--warm);
   color: #fff;
   font-weight: 600;
+}
+
+/* 페이지 전환 링크 */
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.page-link:hover {
+  text-decoration: underline;
 }

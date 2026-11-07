@@ -1,6 +1,6 @@
 import type { Scene } from '../sim/scene';
 import { LUT_DIV, LUT_SEQ, lutCss } from './colormap';
-import { P_SCALE, potentialScale, type DisplayMode } from './FieldView';
+import { P_SCALE, potentialScale, type DisplayMode } from './heatmap';
 
 function gradient(lut: Uint8ClampedArray): string {
   const stops = Array.from({ length: 11 }, (_, i) => `${lutCss(lut, i / 10)} ${i * 10}%`);

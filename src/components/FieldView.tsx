@@ -4,19 +4,12 @@
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { sampleForce } from '../physics/field2d';
-import { energyCoeff } from '../physics/gorkov';
 import type { BallSim, BallStatus } from '../sim/ballSim';
 import type { Scene } from '../sim/scene';
-import { LUT_DIV, LUT_SEQ } from './colormap';
+import { stepBall } from '../state/useSimulation';
+import { fieldToRGBA, type DisplayMode } from './heatmap';
 
-export type DisplayMode = 'amp' | 'potential' | 'instant';
-
-/** 고정 색 범위 (구동 세기 변화가 화면 밝기로 보이도록) */
-export const P_SCALE = 2000; // Pa
-export function potentialScale(scene: Scene): number {
-  // 기준 P0 = 1500 Pa일 때 A층 마디의 |U| 크기
-  return scene.particle.V * energyCoeff(1500, scene.med) * 1.5 * Math.max(scene.particle.f2, 0.1);
-}
+export { P_SCALE, potentialScale, type DisplayMode } from './heatmap';
 
 interface Props {
   scene: Scene | null;
@@ -104,10 +97,10 @@ export default function FieldView({ scene, simRef, mode, animate, showForces, ti
     let img: ImageData | null = null;
     let cachedScene: Scene | null = null;
     let cachedMode: DisplayMode | null = null;
-    let lastStatus: BallStatus | null = null;
+    const last = { status: null as BallStatus | null };
     let arrows: { scene: Scene; a: ArrowField } | null = null;
     const ballF = { fx: 0, fz: 0 };
-    let last = performance.now();
+    let lastT = performance.now();
     let raf = 0;
     let cssW = 0;
     let cssH = 0;
@@ -133,45 +126,17 @@ export default function FieldView({ scene, simRef, mode, animate, showForces, ti
         off.height = g.nz;
         img = offCtx.createImageData(g.nx, g.nz);
       }
-      const data = img.data;
-      const s = sc.s;
-      const s2 = s * s;
-      const uScale = potentialScale(sc);
-      const lut = m === 'amp' ? LUT_SEQ : LUT_DIV;
-      const c = Math.cos(phase);
-      const sn = Math.sin(phase);
-      for (let iz = 0; iz < g.nz; iz++) {
-        const row = g.nz - 1 - iz; // z 위쪽이 화면 위
-        for (let ix = 0; ix < g.nx; ix++) {
-          const i = iz * g.nx + ix;
-          let t: number;
-          if (m === 'amp') t = (s * Math.sqrt(g.p2[i])) / P_SCALE;
-          else if (m === 'potential') t = 0.5 + (0.5 * s2 * sc.potential.U[i]) / uScale;
-          else t = 0.5 + (0.5 * s * (g.pRe[i] * c + g.pIm[i] * sn)) / P_SCALE;
-          const li = Math.max(0, Math.min(255, (t * 255) | 0)) * 3;
-          const o = (row * g.nx + ix) * 4;
-          data[o] = lut[li];
-          data[o + 1] = lut[li + 1];
-          data[o + 2] = lut[li + 2];
-          data[o + 3] = 255;
-        }
-      }
+      fieldToRGBA(sc, m, phase, img.data);
       offCtx.putImageData(img, 0, 0);
     };
 
     const frame = (tNow: number) => {
       raf = requestAnimationFrame(frame);
-      const realDt = Math.min(0.1, (tNow - last) / 1000);
-      last = tNow;
+      const realDt = Math.min(0.1, (tNow - lastT) / 1000);
+      lastT = tNow;
       const { scene: sc, mode: m, animate: anim, showForces: forces, timeScale: ts, onStatus: report } = props.current;
+      stepBall(simRef, realDt, ts, sc, last, report);
       const sim = simRef.current;
-      if (sim) {
-        sim.advanceFrame(realDt, ts, sc ?? undefined);
-        if (sim.status !== lastStatus) {
-          lastStatus = sim.status;
-          report(sim.status);
-        }
-      }
 
       const css = getComputedStyle(canvas);
       ctx.fillStyle = css.getPropertyValue('--canvas-bg') || '#111';

@@ -1,7 +1,7 @@
 import type { SimParams } from '../physics/params';
 import { WEIGHT_SPEEDS, WEIGHT_TEST_SECONDS } from '../sim/ballSim';
 import { SLIDERS, type SliderDef } from '../state/sliders';
-import type { DisplayMode } from './FieldView';
+import type { DisplayMode } from './heatmap';
 
 interface Props {
   params: SimParams;

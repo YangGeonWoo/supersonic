@@ -38,6 +38,10 @@ export interface SimParams {
   timeScale: number;
   /** 점음원 지향성 (1 + cosθ)/2 사용 여부 */
   directivity: boolean;
+  /** 위 발생기 진폭 / 아래 발생기 진폭 (1 = 같은 신호). 3D 페이지에서만 조절 */
+  ampRatio: number;
+  /** 진행파 복사압(밀림) 항을 힘에 더할지. 2D 페이지는 항상 false */
+  travelingForce: boolean;
 }
 
 /** 기본 조건의 간격 d = 5·λ/2 [m] */
@@ -60,5 +64,7 @@ export function defaultParams(): SimParams {
     zeta: ASSUMED_DAMPING_RATIO,
     timeScale: 0.05,
     directivity: DEFAULT_DIRECTIVITY,
+    ampRatio: 1,
+    travelingForce: false,
   };
 }
