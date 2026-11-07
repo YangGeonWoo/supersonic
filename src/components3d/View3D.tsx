@@ -48,6 +48,7 @@ function cssVar(name: string, fallback: string): string {
 
 export default function View3D(props: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const fpsRef = useRef<HTMLSpanElement>(null);
   const live = useRef(props);
   live.current = props;
 
@@ -58,7 +59,12 @@ export default function View3D(props: Props) {
     renderer.setPixelRatio(coarse ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     wrap.appendChild(renderer.domElement);
     renderer.domElement.className = 'view3d-canvas';
-    renderer.domElement.setAttribute('aria-label', '발생기, 음압 단면, 마디, 공의 3D 장면 (드래그로 회전, 휠로 확대)');
+    renderer.domElement.setAttribute(
+      'aria-label',
+      '발생기, 음압 단면, 마디, 공의 3D 장면. 드래그 또는 방향키로 회전, 휠 또는 +/− 키로 확대, 0 키로 처음 시점',
+    );
+    renderer.domElement.setAttribute('role', 'img');
+    renderer.domElement.tabIndex = 0; // 키보드로 조작할 수 있게
 
     const scene3 = new THREE.Scene();
     const setBg = () => (scene3.background = new THREE.Color(cssVar('--canvas-bg', '#0d1117')));
@@ -110,7 +116,13 @@ export default function View3D(props: Props) {
     scene3.add(nodeGroup);
 
     // 공
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+    // 공과 화살표는 반투명 단면 뒤에 그려 단면에 가려지지 않게 한다
+    // (단면이 공 중심을 지나서 공의 절반이 비쳐 보이면 달걀처럼 길쭉해 보였음)
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 24),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, transparent: true, opacity: 1 }),
+    );
+    ball.renderOrder = 10;
     scene3.add(ball);
 
     // 힘 화살표 (공에 작용): 음향 방사력, 중력
@@ -118,6 +130,51 @@ export default function View3D(props: Props) {
     const arrowGravity = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(), 1, 0xf87171, 1.6, 1);
     const arrowPush = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1, 0xfde047, 1.6, 1);
     scene3.add(arrowAcoustic, arrowGravity, arrowPush);
+    for (const a of [arrowAcoustic, arrowGravity, arrowPush]) {
+      a.renderOrder = 11;
+      a.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m) {
+          m.transparent = true;
+          m.depthTest = false; // 공 안에서 시작하는 화살표도 보이게
+        }
+        o.renderOrder = 11;
+      });
+    }
+
+    // 키보드 조작: 방향키 회전, +/− 확대, 0 처음 시점
+    const home = { pos: camera.position.clone(), target: controls.target.clone() };
+    const sph = new THREE.Spherical();
+    const off = new THREE.Vector3();
+    const onKey = (e: KeyboardEvent) => {
+      const step = THREE.MathUtils.degToRad(e.shiftKey ? 15 : 5);
+      off.copy(camera.position).sub(controls.target);
+      sph.setFromVector3(off);
+      let handled = true;
+      if (e.key === 'ArrowLeft') sph.theta -= step;
+      else if (e.key === 'ArrowRight') sph.theta += step;
+      else if (e.key === 'ArrowUp') sph.phi = Math.max(0.05, sph.phi - step);
+      else if (e.key === 'ArrowDown') sph.phi = Math.min(Math.PI - 0.05, sph.phi + step);
+      else if (e.key === '+' || e.key === '=') sph.radius = Math.max(controls.minDistance || 5, sph.radius * 0.9);
+      else if (e.key === '-' || e.key === '_') sph.radius = Math.min(400, sph.radius / 0.9);
+      else if (e.key === '0') {
+        camera.position.copy(home.pos);
+        controls.target.copy(home.target);
+        controls.update();
+        e.preventDefault();
+        return;
+      } else handled = false;
+      if (!handled) return;
+      e.preventDefault();
+      off.setFromSpherical(sph);
+      camera.position.copy(controls.target).add(off);
+      controls.update();
+    };
+    renderer.domElement.addEventListener('keydown', onKey);
+
+    // fps 표시 (0.5초마다 DOM 글자만 바꿈, React 상태 아님)
+    let fpsFrames = 0;
+    let fpsT0 = performance.now();
     const pushF = { fx: 0, fz: 0 };
 
     let built: Scene | null = null;
@@ -191,6 +248,13 @@ export default function View3D(props: Props) {
 
     const frame = (tNow: number) => {
       raf = requestAnimationFrame(frame);
+      fpsFrames++;
+      if (tNow - fpsT0 >= 500) {
+        const el = fpsRef.current;
+        if (el) el.textContent = `${Math.round((fpsFrames * 1000) / (tNow - fpsT0))} fps`;
+        fpsFrames = 0;
+        fpsT0 = tNow;
+      }
       const realDt = Math.min(0.1, (tNow - lastT) / 1000);
       lastT = tNow;
       const { scene: sc, simRef, mode, animate, showForces, timeScale, onStatus, options } = live.current;
@@ -257,6 +321,7 @@ export default function View3D(props: Props) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       mq.removeEventListener('change', setBg);
+      renderer.domElement.removeEventListener('keydown', onKey);
       controls.dispose();
       renderer.dispose();
       tex?.dispose();
@@ -264,5 +329,9 @@ export default function View3D(props: Props) {
     };
   }, []);
 
-  return <div ref={wrapRef} className="view3d-wrap" />;
+  return (
+    <div ref={wrapRef} className="view3d-wrap">
+      <span ref={fpsRef} className="fps" aria-hidden="true" title="화면 갱신 속도 (이 기기 기준)" />
+    </div>
+  );
 }

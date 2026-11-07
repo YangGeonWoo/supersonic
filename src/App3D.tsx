@@ -109,7 +109,7 @@ export default function App3D() {
                 onChange={(e) => setView((v) => ({ ...v, opacity: Number(e.target.value) }))}
               />
             </label>
-            <span className="hint">드래그: 회전 · 휠: 확대 · 우클릭 드래그: 이동</span>
+            <span className="hint">드래그·방향키: 회전 · 휠·+/−: 확대 · 우클릭 드래그: 이동 · 0: 처음 시점</span>
           </div>
           {sim.showForces && (
             <p className="arrow-key">

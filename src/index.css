@@ -594,3 +594,27 @@ button.snap small {
   font-size: 12px;
   line-height: 1.4;
 }
+
+/* 3D: fps 표시, 키보드 포커스 */
+.view3d-wrap {
+  position: relative;
+}
+.fps {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #e6edf3;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.fps:empty {
+  display: none;
+}
+.view3d-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

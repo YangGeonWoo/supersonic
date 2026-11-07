@@ -81,7 +81,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
         const caution = offAxis || lateral;
         const label = !caution ? STATUS_LABEL[status] : offAxis ? '부양 (축 밖)' : '부양 (옆으로 불안정)';
         return (
-          <div className={`status ${caution ? 'status-moving' : `status-${status}`}`}>
+          <div className={`status ${caution ? 'status-moving' : `status-${status}`}`} role="status" aria-live="polite">
             <span>상태</span>
             <strong>{label}</strong>
             {busy && <em className="busy">계산 중…</em>}
