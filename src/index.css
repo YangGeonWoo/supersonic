@@ -481,3 +481,63 @@ button.snap small {
 .page-link:hover {
   text-decoration: underline;
 }
+
+/* 3D 뷰 */
+.view3d-wrap {
+  width: 100%;
+}
+.view3d-canvas {
+  display: block;
+  border-radius: 6px;
+  touch-action: none;
+}
+.view3d-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 8px 4px 0;
+  font-size: 13px;
+}
+.view3d-tools .check {
+  margin: 0;
+}
+.tool-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tool-range input {
+  width: 110px;
+  accent-color: var(--accent);
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: auto;
+}
+.arrow-key {
+  margin: 6px 4px 0;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+}
+.sw-acoustic {
+  background: #22d3ee;
+}
+.sw-gravity {
+  background: #f87171;
+  margin-left: 8px;
+}
+.sw-push {
+  background: #fde047;
+  margin-left: 8px;
+}

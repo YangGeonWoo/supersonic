@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import ControlPanel from './components/ControlPanel';
+import Legend from './components/Legend';
+import SideGraphs from './components/SideGraphs';
+import View3D, { type View3DOptions } from './components3d/View3D';
 import StatsPanel from './components/StatsPanel';
 import { defaultParams, type SimParams } from './physics/params';
 import { useSimulation } from './state/useSimulation';
@@ -12,6 +16,7 @@ export function default3DParams(): SimParams {
 export default function App3D() {
   const sim = useSimulation(default3DParams);
   const { params, scene, simRef } = sim;
+  const [view, setView] = useState<View3DOptions>({ planes: true, opacity: 0.85, nodes: true });
 
   return (
     <div className="app">
@@ -44,7 +49,48 @@ export default function App3D() {
           weightSpeed={sim.weightSpeed}
           onWeightSpeed={sim.onWeightSpeed}
         />
-        <section className="view">3D 뷰 준비 중</section>
+        <section className="view">
+          <View3D
+            scene={scene}
+            simRef={simRef}
+            mode={sim.mode}
+            animate={sim.animate}
+            showForces={sim.showForces}
+            timeScale={params.timeScale}
+            onStatus={sim.onStatus}
+            options={view}
+          />
+          <div className="view3d-tools">
+            <label className="check">
+              <input type="checkbox" checked={view.planes} onChange={(e) => setView((v) => ({ ...v, planes: e.target.checked }))} />
+              음압 단면 (x-z, y-z)
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={view.nodes} onChange={(e) => setView((v) => ({ ...v, nodes: e.target.checked }))} />
+              마디 면
+            </label>
+            <label className="tool-range">
+              단면 불투명도
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={view.opacity}
+                disabled={!view.planes}
+                onChange={(e) => setView((v) => ({ ...v, opacity: Number(e.target.value) }))}
+              />
+            </label>
+            <span className="hint">드래그: 회전 · 휠: 확대 · 우클릭 드래그: 이동</span>
+          </div>
+          {sim.showForces && (
+            <p className="arrow-key">
+              <span className="sw sw-acoustic" /> 음향 방사력 <span className="sw sw-gravity" /> 중력
+            </p>
+          )}
+          <Legend mode={sim.mode} scene={scene} />
+          <SideGraphs scene={scene} simRef={simRef} />
+        </section>
         <StatsPanel scene={scene} status={sim.status} busy={sim.busy} simRef={simRef} />
       </main>
     </div>
