@@ -24,6 +24,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # 화면 자동 테스트 (2D·3D 페이지를 실제 브라우저로). 실패하면 배포하지 않음
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

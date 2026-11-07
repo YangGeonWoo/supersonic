@@ -32,7 +32,7 @@ function Row({ k, v, hint }: { k: string; v: string; hint?: string }) {
 
 /** 공 무게와 무게 테스트 진행 (10 Hz로 simRef를 읽는다 — 매 프레임 React 상태를 바꾸지 않음) */
 function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
-  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0, z: NaN });
+  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0, z: NaN, rhoLimitTest: NaN });
   useEffect(() => {
     const id = setInterval(() => {
       const sim = simRef.current;
@@ -46,6 +46,8 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
         speed: t?.speed ?? 1,
         x: sim.state.x,
         z: sim.state.z,
+        // 무게 늘리기를 시작할 때 공이 있던 덫의 한계 (떨어진 뒤 공 위치로 다시 구하면 다른 덫이 됨)
+        rhoLimitTest: t?.rhoLimit ?? NaN,
         rhoFall: t?.rhoFall ?? null,
         rhoStart: t?.rhoStart ?? NaN,
         started: !!t,
@@ -125,7 +127,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
                 {snap.elapsed.toFixed(1)}초 버팀{snap.speed !== 1 && ` (${snap.speed}× 속도)`}
                 <br />
                 <small>
-                  부양 한계(2D 장) 대비 {((snap.rhoFall / rhoLimit) * 100).toFixed(0)}%
+                  부양 한계(2D 장) 대비 {((snap.rhoFall / (Number.isFinite(snap.rhoLimitTest) ? snap.rhoLimitTest : rhoLimit)) * 100).toFixed(0)}%
                 </small>
               </>
             ) : snap.active ? (
