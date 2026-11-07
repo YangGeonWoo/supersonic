@@ -124,3 +124,72 @@ export function dampingCoeff(zeta: number, m: number, kappa: number): number {
 export function stepsForFrame(realDt: number, timeScale: number, dt: number): number {
   return Math.min(MAX_STEPS_PER_FRAME, Math.max(0, Math.round((realDt * timeScale) / dt)));
 }
+
+// ───────────── 3차원 (GPU 3D 격자 모드) ─────────────
+
+/** 3D 음향 방사력 (중력 제외) [N]. 계산 영역 밖이면 0 */
+export type ForceFn3 = (x: number, y: number, z: number, out: { fx: number; fy: number; fz: number }) => void;
+
+export interface Dynamics3 {
+  m: number;
+  /** 방향별 감쇠 계수 [kg/s] (유효 감쇠비 ζ를 방향마다 같게 — 가정값) */
+  cdx: number;
+  cdy: number;
+  cdz: number;
+  g: number;
+  force: ForceFn3;
+  /** 벽(발생기 면) 처리: 공 중심이 면에서 반지름보다 가까우면 위치를 되돌리고 속도 0, 닿았으면 true */
+  walls: (s: BallState3) => boolean;
+}
+
+export interface BallState3 {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  ax: number;
+  ay: number;
+  az: number;
+  t: number;
+}
+
+const tmp3 = { fx: 0, fy: 0, fz: 0 };
+
+function accel3(dyn: Dynamics3, s: BallState3): void {
+  dyn.force(s.x, s.y, s.z, tmp3);
+  s.ax = (tmp3.fx - dyn.cdx * s.vx) / dyn.m;
+  s.ay = (tmp3.fy - dyn.cdy * s.vy) / dyn.m;
+  s.az = (tmp3.fz - dyn.cdz * s.vz) / dyn.m - dyn.g;
+}
+
+export function initState3(dyn: Dynamics3, x: number, y: number, z: number): BallState3 {
+  const s: BallState3 = { x, y, z, vx: 0, vy: 0, vz: 0, ax: 0, ay: 0, az: 0, t: 0 };
+  dyn.walls(s);
+  accel3(dyn, s);
+  return s;
+}
+
+/** 속도 Verlet (감쇠 반암시적) — 2D verletStep과 같은 방식을 3축으로 */
+export function verletStep3(dyn: Dynamics3, s: BallState3, dt: number): void {
+  const h = 0.5 * dt;
+  const vhx = s.vx + h * s.ax;
+  const vhy = s.vy + h * s.ay;
+  const vhz = s.vz + h * s.az;
+  s.x += dt * vhx;
+  s.y += dt * vhy;
+  s.z += dt * vhz;
+  s.t += dt;
+  dyn.force(s.x, s.y, s.z, tmp3);
+  s.vx = (vhx + (h * tmp3.fx) / dyn.m) / (1 + (h * dyn.cdx) / dyn.m);
+  s.vy = (vhy + (h * tmp3.fy) / dyn.m) / (1 + (h * dyn.cdy) / dyn.m);
+  s.vz = (vhz + h * (tmp3.fz / dyn.m - dyn.g)) / (1 + (h * dyn.cdz) / dyn.m);
+  if (dyn.walls(s)) {
+    accel3(dyn, s);
+  } else {
+    s.ax = (tmp3.fx - dyn.cdx * s.vx) / dyn.m;
+    s.ay = (tmp3.fy - dyn.cdy * s.vy) / dyn.m;
+    s.az = (tmp3.fz - dyn.cdz * s.vz) / dyn.m - dyn.g;
+  }
+}
