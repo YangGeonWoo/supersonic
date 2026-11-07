@@ -19,14 +19,14 @@ const D_RANGE = (() => {
   return { min: s.fromUi(s.min), max: s.fromUi(s.max) };
 })();
 
-interface Box {
+export interface Box {
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
-interface Colors {
+export interface Colors {
   fg: string;
   muted: string;
   grid: string;
@@ -37,7 +37,7 @@ interface Colors {
   node: string;
 }
 
-function readColors(el: Element): Colors {
+export function readColors(el: Element): Colors {
   const c = getComputedStyle(el);
   const v = (n: string, d: string) => c.getPropertyValue(n).trim() || d;
   return {
@@ -53,7 +53,7 @@ function readColors(el: Element): Colors {
 }
 
 /** 캔버스 크기를 부모 폭에 맞추고 CSS 픽셀 단위 컨텍스트를 돌려준다 */
-function fit(canvas: HTMLCanvasElement, h: number): { ctx: CanvasRenderingContext2D; w: number; h: number } {
+export function fit(canvas: HTMLCanvasElement, h: number): { ctx: CanvasRenderingContext2D; w: number; h: number } {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.parentElement!.clientWidth;
   if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
@@ -69,20 +69,20 @@ function fit(canvas: HTMLCanvasElement, h: number): { ctx: CanvasRenderingContex
 }
 
 /** 유효숫자 2자리, 지수 표기 없이 */
-function nice(v: number): string {
+export function nice(v: number): string {
   if (v >= 100) return Math.round(v).toString();
   if (v >= 10) return v.toFixed(0);
   if (v >= 1) return v.toFixed(1);
   return v.toPrecision(2);
 }
 
-function symRange(v: ArrayLike<number>, extra = 0): number {
+export function symRange(v: ArrayLike<number>, extra = 0): number {
   let m = Math.abs(extra);
   for (let i = 0; i < v.length; i++) m = Math.max(m, Math.abs(v[i]));
   return m > 0 ? m * 1.08 : 1;
 }
 
-function curve(ctx: CanvasRenderingContext2D, xs: ArrayLike<number>, ys: ArrayLike<number>, X: (v: number) => number, Y: (v: number) => number, color: string) {
+export function curve(ctx: CanvasRenderingContext2D, xs: ArrayLike<number>, ys: ArrayLike<number>, X: (v: number) => number, Y: (v: number) => number, color: string) {
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.lineJoin = 'round';
@@ -96,7 +96,7 @@ function curve(ctx: CanvasRenderingContext2D, xs: ArrayLike<number>, ys: ArrayLi
   ctx.stroke();
 }
 
-function hline(ctx: CanvasRenderingContext2D, b: Box, y: number, color: string, dash: number[] = []) {
+export function hline(ctx: CanvasRenderingContext2D, b: Box, y: number, color: string, dash: number[] = []) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = 1;
@@ -108,7 +108,7 @@ function hline(ctx: CanvasRenderingContext2D, b: Box, y: number, color: string, 
   ctx.restore();
 }
 
-function vline(ctx: CanvasRenderingContext2D, b: Box, x: number, color: string, dash: number[] = [], width = 1) {
+export function vline(ctx: CanvasRenderingContext2D, b: Box, x: number, color: string, dash: number[] = [], width = 1) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -120,7 +120,7 @@ function vline(ctx: CanvasRenderingContext2D, b: Box, x: number, color: string, 
   ctx.restore();
 }
 
-function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, align: CanvasTextAlign = 'left', base: CanvasTextBaseline = 'alphabetic') {
+export function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, align: CanvasTextAlign = 'left', base: CanvasTextBaseline = 'alphabetic') {
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.textBaseline = base;

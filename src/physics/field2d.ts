@@ -110,6 +110,19 @@ export function absGrad2(f: PointField): number {
   );
 }
 
+/**
+ * 시간 평균 음향 세기 벡터 I = ½·Re(p·v*) [W/m²] (s = 1 기준이면 s²를 곱해 쓴다).
+ * v = ∇P/(iωρ0), p(t) = Re[P·e^(−iωt)] 규약에서 I = Im(P*·∇P) / (2ωρ0).
+ * 순수 정상파에서는 0이고, 진행파 성분이 있으면 에너지가 흐르는 방향을 가리킨다.
+ */
+export function intensityOf(f: PointField, med: Medium, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const c = 1 / (2 * med.omega * med.rho0);
+  out.x = (f.pr * f.gxi - f.pi * f.gxr) * c;
+  out.y = (f.pr * f.gyi - f.pi * f.gyr) * c;
+  out.z = (f.pr * f.gzi - f.pi * f.gzr) * c;
+  return out;
+}
+
 // ───────────── 계산 영역 ─────────────
 
 export interface Domain {

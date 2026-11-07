@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ControlPanel from './components/ControlPanel';
 import Legend from './components/Legend';
 import SideGraphs from './components/SideGraphs';
+import LateralPanel from './components3d/LateralPanel';
 import View3D, { type View3DOptions } from './components3d/View3D';
 import StatsPanel from './components/StatsPanel';
 import { defaultParams, type SimParams } from './physics/params';
@@ -91,7 +92,10 @@ export default function App3D() {
           <Legend mode={sim.mode} scene={scene} />
           <SideGraphs scene={scene} simRef={simRef} />
         </section>
-        <StatsPanel scene={scene} status={sim.status} busy={sim.busy} simRef={simRef} />
+        <div className="side-col">
+          <StatsPanel scene={scene} status={sim.status} busy={sim.busy} simRef={simRef} />
+          <LateralPanel scene={scene} simRef={simRef} />
+        </div>
       </main>
     </div>
   );

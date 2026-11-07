@@ -541,3 +541,20 @@ button.snap small {
   background: #fde047;
   margin-left: 8px;
 }
+
+/* 3D 페이지 오른쪽 열 */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.lateral .note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+.lateral .graph-canvas {
+  margin-top: 8px;
+}
