@@ -39,6 +39,8 @@ export const DEFAULT_HALF_WAVES = 5;
 
 /** 점음원 간격 상한 = λ/4 */
 export const SOURCE_SPACING_FRACTION = 1 / 4;
+/** 2차 이상 거울상 점음원 간격 (계산 영역에서 2d 이상 떨어져 있어 거칠게 둬도 됨) */
+export const FAR_IMAGE_SPACING_FRACTION = 1 / 2;
 /** 2D 격자 간격 상한 = λ/40 */
 export const GRID_SPACING_FRACTION = 1 / 40;
 /** 축 위 1D 샘플 간격 상한 = λ/200 */

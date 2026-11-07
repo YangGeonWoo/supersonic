@@ -42,6 +42,11 @@ export interface SimParams {
   ampRatio: number;
   /** 진행파 복사압(밀림) 항을 힘에 더할지. 2D 페이지는 항상 false */
   travelingForce: boolean;
+  /**
+   * 상대 발생기 면의 반사를 거울상 점음원으로 직접 계산할지 (3D 페이지 기본 true, 2D는 false).
+   * false면 SPEC 2.3의 공진 이득 배율 G(d)를 쓴다.
+   */
+  reflections: boolean;
 }
 
 /** 기본 조건의 간격 d = 5·λ/2 [m] */
@@ -66,5 +71,6 @@ export function defaultParams(): SimParams {
     directivity: DEFAULT_DIRECTIVITY,
     ampRatio: 1,
     travelingForce: false,
+    reflections: false,
   };
 }

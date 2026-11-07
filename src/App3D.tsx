@@ -11,9 +11,9 @@ import { AMP_RATIO_SLIDER } from './state/sliders';
 import { useSimulation } from './state/useSimulation';
 import './index.css';
 
-/** 3D 페이지 기본값: 2D와 같고 진행파 복사압(밀림)만 켠다 */
+/** 3D 페이지 기본값: 2D와 같고 진행파 복사압(밀림)과 반사파 직접 계산을 켠다 */
 export function default3DParams(): SimParams {
-  return { ...defaultParams(), travelingForce: true };
+  return { ...defaultParams(), travelingForce: true, reflections: true };
 }
 
 const DEFAULT_VIEW: View3DOptions = { planes: true, opacity: 0.85, nodes: true };
@@ -68,6 +68,10 @@ export default function App3D() {
               <label className="check">
                 <input type="checkbox" checked={params.travelingForce} onChange={(e) => sim.setFlag('travelingForce', e.target.checked)} />
                 진행파 복사압 (밀림)
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={params.reflections} onChange={(e) => sim.setFlag('reflections', e.target.checked)} />
+                반사파 직접 계산 (거울상)
               </label>
             </>
           }
@@ -128,7 +132,8 @@ export default function App3D() {
       <footer>
         정량값이 아니라 경향을 보여주는 모델입니다. Gor’kov 근사는 공이 파장(약 8.6 mm)보다 충분히 작을 때(ka ≪ 1, 지름 약 1.4 mm
         이하)만 잘 맞고 기본 공 3 mm(ka ≈ 1.1)는 그 범위 밖입니다. 반사계수 R·감쇠비 ζ는 가정값입니다. 발생기 면에서 λ/8 이내는 계산하지 않습니다. 진행파 복사압은 강체 구 가정으로
-        정상파 항에 단순히 더한 근사입니다. 음향 유동, 비선형 효과, 발생기 기울어짐·어긋남은 다루지 않습니다. 장은 축대칭이라 x-z
+        정상파 항에 단순히 더한 근사입니다. 반사파는 발생기 면을 무한 평면으로 보고 거울상 점음원(5차까지)으로 더하므로
+        실제 원판보다 반사가 조금 크게 들어갑니다. 음향 유동, 비선형 효과, 발생기 기울어짐·어긋남은 다루지 않습니다. 장은 축대칭이라 x-z
         단면 하나를 회전시켜 보여줍니다.
       </footer>
     </div>

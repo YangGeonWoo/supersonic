@@ -4,7 +4,7 @@
  *  2) 거리 d에 대한 공진 이득 G(d), 현재 d
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { resonanceCurve } from '../physics/resonance';
+import { drivenPairGain, resonanceCurve } from '../physics/resonance';
 import type { BallSim } from '../sim/ballSim';
 import type { Scene } from '../sim/scene';
 import { SLIDERS } from '../state/sliders';
@@ -199,9 +199,11 @@ function drawGainGraph(canvas: HTMLCanvasElement, sc: Scene, col: Colors) {
   ctx.font = '11px system-ui, sans-serif';
   const b: Box = { x: 30, y: 20, w: w - 38, h: h - 20 - 20 };
   const { med, params } = sc;
-  const key = `${med.k}|${params.R}`;
+  const pair = params.reflections; // 반사파 직접 계산(3D): 두 발생기 구동 공진 이득
+  const key = `${med.k}|${params.R}|${pair ? params.phi : 'spec'}`;
   if (!gCache || gCache.key !== key) {
     const c = resonanceCurve(D_RANGE.min, D_RANGE.max, 600, med.k, params.R);
+    if (pair) for (let i = 0; i < c.d.length; i++) c.G[i] = drivenPairGain(c.d[i], med.k, params.R, params.phi);
     gCache = { key, ...c };
   }
   const gTop = Math.max(2, (1 / (1 - Math.min(params.R, 0.95))) * 1.1);
@@ -220,7 +222,7 @@ function drawGainGraph(canvas: HTMLCanvasElement, sc: Scene, col: Colors) {
   for (let n = Math.ceil(D_RANGE.min / half); n * half <= D_RANGE.max; n++) vline(ctx, b, X(n * half), col.grid, [2, 3]);
 
   curve(ctx, gCache.d, gCache.G, X, Y, col.g);
-  label(ctx, '공진 이득 G(d)', b.x, b.y - 6, col.g);
+  label(ctx, pair ? '공진 이득 G(d) — 두 발생기 구동' : '공진 이득 G(d)', b.x, b.y - 6, col.g);
   label(ctx, `R = ${params.R.toFixed(2)} (가정값)`, b.x + b.w, b.y - 6, col.muted, 'right');
 
   for (let t = 10; t <= 40; t += 10) label(ctx, `${t}`, X(t / 1e3), h - 6, col.muted, t === 10 ? 'left' : 'center');
@@ -294,7 +296,11 @@ export default function SideGraphs({ scene, simRef }: Props) {
         <div className="graph-canvas">
           <canvas ref={gainRef} aria-label="발생기 간격 d에 대한 공진 이득 G(d) 그래프" />
         </div>
-        <small>d가 λ/2의 정수배(세로 점선)일 때 반사파가 겹쳐 음압이 커집니다. 경향만 보여주는 단순 모델입니다.</small>
+        <small>
+          {scene?.params.reflections
+            ? '두 발생기를 같은 위상으로 구동하면 d가 λ의 정수배(세로 점선 하나 걸러)일 때 커지고, 그 사이 홀수배에서는 상대 발생기의 파와 반사파가 상쇄돼 약해집니다. 위상차 φ를 바꾸면 공진 위치도 움직입니다. 1차원 평면파 공식이며, 음향장은 반사파를 직접 계산합니다.'
+            : 'd가 λ/2의 정수배(세로 점선)일 때 반사파가 겹쳐 음압이 커집니다. 경향만 보여주는 단순 모델입니다.'}
+        </small>
       </div>
     </div>
   );

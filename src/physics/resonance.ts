@@ -41,3 +41,40 @@ export function resonanceCurve(
   }
   return { d, G };
 }
+
+/**
+ * 두 발생기를 모두 구동할 때의 공진 이득 (1차원 평면파, 양쪽 면 반사계수 R, 위 발생기 위상 φ).
+ *   위로 가는 파 u = A + R·v·e^{ikd},  아래로 가는 파 v = A·e^{iφ} + R·u·e^{ikd}
+ *   → |u|/|A| = |1 + R·e^{i(kd+φ)}| / |1 − R²·e^{2ikd}|
+ * φ = 0이면 d = nλ(λ/2의 짝수배)에서 1/(1−R)로 최대, d = (n+½)λ(홀수배)에서는 1/(1+R)로 오히려 약하다.
+ * (SPEC 2.3의 G(d) = 1/|1 − R·e^{2ikd}|는 발생기 하나 + 반사판 모델이라 이 차이를 담지 못한다)
+ */
+export function drivenPairGain(d: number, k: number, R: number, phi: number): number {
+  const a = k * d + phi;
+  const nr = 1 + R * Math.cos(a);
+  const ni = R * Math.sin(a);
+  const th = 2 * k * d;
+  const dr = 1 - R * R * Math.cos(th);
+  const di = -R * R * Math.sin(th);
+  return Math.sqrt((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+
+/** d 근처(±λ/2)에서 drivenPairGain이 최대인 간격 (범위 [dMin, dMax] 안) */
+export function nearestPairResonance(d: number, lambda: number, R: number, phi: number, dMin: number, dMax: number): number {
+  const k = (2 * Math.PI) / lambda;
+  const lo = Math.max(dMin, d - lambda / 2);
+  const hi = Math.min(dMax, d + lambda / 2);
+  const n = Math.max(2, Math.ceil((hi - lo) / (lambda / 800)));
+  let best = d;
+  let bestG = -Infinity;
+  for (let i = 0; i <= n; i++) {
+    const x = lo + ((hi - lo) * i) / n;
+    const g = drivenPairGain(x, k, R, phi);
+    // 같은 이득이면 원래 d에 가까운 쪽
+    if (g > bestG + 1e-12 || (Math.abs(g - bestG) <= 1e-12 && Math.abs(x - d) < Math.abs(best - d))) {
+      bestG = g;
+      best = x;
+    }
+  }
+  return best;
+}

@@ -47,7 +47,7 @@ describe('Gor’kov 한계 경고', () => {
 describe('3D 페이지 수치 = 2D', () => {
   it('밀림 off: F_max, 마디, 안착 위치·상태가 2D와 완전히 같음', () => {
     const p2 = defaultParams();
-    const p3 = { ...default3DParams(), travelingForce: false };
+    const p3 = { ...default3DParams(), travelingForce: false, reflections: false };
     const c = calibrate(p2.directivity);
     const a = buildScene(p2, c);
     const b = buildScene(p3, c);
@@ -61,18 +61,17 @@ describe('3D 페이지 수치 = 2D', () => {
     expect(sb.status).toBe(sa.status);
   });
 
-  it('밀림 on(3D 기본): F_max·마디 개수·상태는 같고, 안착 위치만 조금 다름', () => {
-    const c = calibrate(true);
-    const a = buildScene(defaultParams(), c);
-    const b = buildScene(default3DParams(), c);
-    expect(b.Fmax).toBe(a.Fmax);
+  it('3D 기본(밀림·반사 on): F_max·마디 개수·상태는 같고, 안착 위치만 조금 다름', () => {
+    const a = buildScene(defaultParams(), calibrate(true));
+    const b = buildScene(default3DParams(), calibrate(true, true));
+    expect(b.Fmax / a.Fmax).toBeCloseTo(1, 6); // 둘 다 기본 조건에서 P0 = 1500 Pa로 보정
     expect(b.nodesB.length).toBe(a.nodesB.length);
     const sa = createBallSim(a);
     const sb = createBallSim(b);
     sa.advanceSim(3);
     sb.advanceSim(3);
     expect(sb.status).toBe(sa.status);
-    console.log(`[체크] 3D 기본(밀림 on) 안착 z = ${(sb.state.z * 1e3).toFixed(4)} mm, 2D ${(sa.state.z * 1e3).toFixed(4)} mm (차이 ${((sb.state.z - sa.state.z) * 1e6).toFixed(1)} µm)`);
+    console.log(`[체크] 3D 기본(밀림·반사 on) 안착 z = ${(sb.state.z * 1e3).toFixed(4)} mm, 2D ${(sa.state.z * 1e3).toFixed(4)} mm (차이 ${((sb.state.z - sa.state.z) * 1e6).toFixed(1)} µm)`);
     expect(Math.abs(sb.state.z - sa.state.z)).toBeLessThan(0.1e-3);
   });
 });

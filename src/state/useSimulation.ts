@@ -8,7 +8,7 @@ import type { DisplayMode } from '../components/heatmap';
 import { makeMedium } from '../physics/acoustics';
 import { calibrate } from '../physics/calibration';
 import type { SimParams } from '../physics/params';
-import { nearestResonanceGapIn } from '../physics/resonance';
+import { nearestPairResonance, nearestResonanceGapIn } from '../physics/resonance';
 import { createBallSim, rebaseBallSim, type BallSim, type BallStatus } from '../sim/ballSim';
 import type { FieldRequest, FieldResponse } from '../sim/field.worker';
 import { buildField, fieldParamsOf, finishScene, type FieldData, type Scene } from '../sim/scene';
@@ -98,8 +98,8 @@ export function useSimulation(makeDefaults: () => SimParams) {
     return () => clearTimeout(t);
   }, [fpKey]);
 
-  // 보정은 지향성 설정별로 한 번
-  const cal = useMemo(() => calibrate(params.directivity), [params.directivity]);
+  // 보정은 지향성·반사 모델 설정별로 한 번
+  const cal = useMemo(() => calibrate(params.directivity, params.reflections), [params.directivity, params.reflections]);
 
   // 가벼운 2단계 (구동 세기, 공, 감쇠 등은 즉시 반영). 시간 배율은 장과 무관하므로 제외
   const { timeScale: _ts, ...physParams } = params;
@@ -130,7 +130,7 @@ export function useSimulation(makeDefaults: () => SimParams) {
     setParams((p) => ({ ...p, [key]: v }));
   }, []);
 
-  const setFlag = useCallback((key: 'directivity' | 'travelingForce', on: boolean) => {
+  const setFlag = useCallback((key: 'directivity' | 'travelingForce' | 'reflections', on: boolean) => {
     setParams((p) => ({ ...p, [key]: on }));
   }, []);
 
@@ -163,7 +163,11 @@ export function useSimulation(makeDefaults: () => SimParams) {
   const onSnapResonance = useCallback(() => {
     setParams((p) => {
       const lam = makeMedium(p.f, p.T).lambda;
-      return { ...p, d: nearestResonanceGapIn(p.d, lam, D_SLIDER.fromUi(D_SLIDER.min), D_SLIDER.fromUi(D_SLIDER.max)) };
+      const lo = D_SLIDER.fromUi(D_SLIDER.min);
+      const hi = D_SLIDER.fromUi(D_SLIDER.max);
+      // 반사파 직접 계산(3D)이면 두 발생기 구동 공진(위상 φ 반영), 아니면 SPEC의 λ/2 정수배
+      const d = p.reflections ? nearestPairResonance(p.d, lam, Math.max(p.R, 0.05), p.phi, lo, hi) : nearestResonanceGapIn(p.d, lam, lo, hi);
+      return { ...p, d };
     });
   }, []);
 

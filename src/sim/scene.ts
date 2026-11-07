@@ -6,7 +6,7 @@
  */
 import { makeMedium, type Medium } from '../physics/acoustics';
 import { sourceStrength, splFromAmplitude, type Calibration } from '../physics/calibration';
-import { GRAVITY, SOURCE_SPACING_FRACTION } from '../physics/constants';
+import { FAR_IMAGE_SPACING_FRACTION, GRAVITY, SOURCE_SPACING_FRACTION } from '../physics/constants';
 import {
   axisForce,
   axisMaxPressure,
@@ -25,10 +25,17 @@ import {
 import { makeParticle, maxForce, nodes1D, stiffness, type Particle } from '../physics/gorkov';
 import { dampingCoeff, oscillationPeriod, timeStep } from '../physics/integrator';
 import type { SimParams } from '../physics/params';
-import { resonanceGain } from '../physics/resonance';
+import { drivenPairGain, resonanceGain } from '../physics/resonance';
 import { pushCoefficient, radiationForceFunction } from '../physics/scattering';
 import { lateralStability } from '../physics/lateral';
-import { makeSourceSet, sampleDisc, type DiscSample, type SourceSet } from '../physics/sourceSampling';
+import {
+  makeSourceSet,
+  reflectionOrders,
+  sampleDisc,
+  withReflections,
+  type DiscSample,
+  type SourceSet,
+} from '../physics/sourceSampling';
 
 /** 음향장(1단계)을 정하는 변수 */
 export interface FieldParams {
@@ -40,14 +47,16 @@ export interface FieldParams {
   directivity: boolean;
   /** 위 발생기 진폭비 */
   ampRatio: number;
+  /** 거울상 반사의 반사계수 (0이면 거울상 없음 → G(d) 배율 모델) */
+  imageR: number;
 }
 
 export function fieldParamsOf(p: SimParams): FieldParams {
-  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity, ampRatio: p.ampRatio };
+  return { f: p.f, T: p.T, d: p.d, at: p.at, phi: p.phi, directivity: p.directivity, ampRatio: p.ampRatio, imageR: p.reflections ? p.R : 0 };
 }
 
 export function sameFieldParams(a: FieldParams, b: FieldParams): boolean {
-  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity && a.ampRatio === b.ampRatio;
+  return a.f === b.f && a.T === b.T && a.d === b.d && a.at === b.at && a.phi === b.phi && a.directivity === b.directivity && a.ampRatio === b.ampRatio && a.imageR === b.imageR;
 }
 
 /** 1단계 결과 (structured clone 가능한 순수 데이터) */
@@ -122,7 +131,11 @@ export function buildField(fp: FieldParams): FieldData {
   const t0 = now();
   const med = makeMedium(fp.f, fp.T);
   const domain = computeDomain(fp.d, med.lambda);
-  const sources = makeSourceSet(getDisc(fp.at, med.lambda), fp.d, fp.phi, fp.ampRatio);
+  let sources = makeSourceSet(getDisc(fp.at, med.lambda), fp.d, fp.phi, fp.ampRatio);
+  if (fp.imageR > 0) {
+    const far = makeSourceSet(sampleDisc(fp.at, med.lambda * FAR_IMAGE_SPACING_FRACTION), fp.d, fp.phi, fp.ampRatio);
+    sources = withReflections(sources, far, fp.d, fp.imageR, reflectionOrders(fp.imageR));
+  }
   const field = computeFieldGrid(sources, med, domain, fp.directivity);
   const axis = computeAxisProfile(sources, med, domain.zMin, domain.zMax, fp.directivity);
   return { fp, med, domain, sources, field, axis, computeMs: now() - t0 };
@@ -163,7 +176,7 @@ export function finishScene(fd: FieldData, input: SimParams, cal: Calibration): 
     particle,
     potential,
     s,
-    gain: resonanceGain(params.d, med.k, params.R),
+    gain: params.reflections ? drivenPairGain(params.d, med.k, params.R, params.phi) : resonanceGain(params.d, med.k, params.R),
     P0,
     spl: splFromAmplitude(P0),
     Fmax,
