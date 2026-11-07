@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { default3DParams } from '../src/App3D';
 import { makeMedium, soundSpeed } from '../src/physics/acoustics';
 import { calibrate } from '../src/physics/calibration';
-import { gorkovSizeWarning } from '../src/physics/gorkov';
+import { gorkovValidity } from '../src/physics/gorkov';
 import { defaultParams } from '../src/physics/params';
 import { createBallSim } from '../src/sim/ballSim';
 import { buildScene } from '../src/sim/scene';
@@ -34,11 +34,13 @@ describe('온도와 마디 간격', () => {
 
 describe('Gor’kov 한계 경고', () => {
   const lam = makeMedium(40e3, 20).lambda;
-  it('λ/2 ≈ 4.29 mm 기준', () => {
-    expect(gorkovSizeWarning(3e-3, lam)).toBe(false);
-    expect(gorkovSizeWarning(4.2e-3, lam)).toBe(false);
-    expect(gorkovSizeWarning(4.4e-3, lam)).toBe(true);
-    expect(gorkovSizeWarning(6e-3, lam)).toBe(true);
+  it('ka < 0.5 정상, 지름 < λ/2 주의, 지름 ≥ λ/2(≈ 4.29 mm) 경고', () => {
+    expect(gorkovValidity(1e-3, lam).level).toBe('ok');
+    expect(gorkovValidity(3e-3, lam).level).toBe('caution'); // 기본 공: ka ≈ 1.1
+    expect(gorkovValidity(3e-3, lam).ka).toBeCloseTo((Math.PI * 3e-3) / lam, 12);
+    expect(gorkovValidity(4.2e-3, lam).level).toBe('caution');
+    expect(gorkovValidity(4.4e-3, lam).level).toBe('invalid');
+    expect(gorkovValidity(6e-3, lam).level).toBe('invalid');
   });
 });
 

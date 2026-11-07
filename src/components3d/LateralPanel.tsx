@@ -12,6 +12,8 @@ import type { Scene } from '../sim/scene';
 interface Props {
   scene: Scene | null;
   simRef: MutableRefObject<BallSim | null>;
+  /** 판정이 바뀔 때 알림 (상태 칸에 함께 표시하기 위해) */
+  onStable?: (stable: boolean) => void;
 }
 
 function nearest(list: number[], z: number): number | null {
@@ -73,12 +75,15 @@ function draw(canvas: HTMLCanvasElement, r: LateralResult, ballRho: number | nul
   }
 }
 
-export default function LateralPanel({ scene, simRef }: Props) {
+export default function LateralPanel({ scene, simRef, onStable }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zTrap, setZTrap] = useState<number | null>(null);
   const traps = useMemo(() => (scene ? trapsOf(scene) : []), [scene]);
   const result = useMemo(() => (scene && zTrap !== null ? lateralFor(scene, zTrap) : null), [scene, zTrap]);
   const push = useMemo(() => (scene && zTrap !== null ? pushEffect(scene, zTrap) : null), [scene, zTrap]);
+  useEffect(() => {
+    if (result) onStable?.(result.stable);
+  }, [result, onStable]);
   const live = useRef({ traps, result });
   live.current = { traps, result };
 
@@ -128,6 +133,7 @@ export default function LateralPanel({ scene, simRef }: Props) {
       <div className={`status ${ok ? 'status-levitating' : 'status-moving'}`}>
         <span>횡방향</span>
         <strong>{ok ? '안정' : '불안정'}</strong>
+        <small className="status-note">축 근처에서 옆으로 밀렸을 때 다시 축으로 돌아오는지 (위 상태 칸은 위아래 판정)</small>
       </div>
       <dl>
         <div className="stat">

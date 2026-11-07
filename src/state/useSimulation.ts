@@ -170,7 +170,11 @@ export function useSimulation(makeDefaults: () => SimParams) {
   const onReset = useCallback(() => {
     releaseNext.current = true;
     setParams(defaultsRef.current());
+    // 표시 설정도 처음 상태로
     setMode('amp');
+    setAnimate(true);
+    setShowForces(false);
+    setWeightSpeed(1);
   }, []);
 
   return {

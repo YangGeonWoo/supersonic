@@ -2,6 +2,7 @@ import ControlPanel from './components/ControlPanel';
 import FieldView from './components/FieldView';
 import Legend from './components/Legend';
 import SideGraphs from './components/SideGraphs';
+import SizeNote from './components/SizeNote';
 import StatsPanel from './components/StatsPanel';
 import { defaultParams } from './physics/params';
 import { useSimulation } from './state/useSimulation';
@@ -43,6 +44,7 @@ export default function App() {
           onWeightSpeed={sim.onWeightSpeed}
         />
         <section className="view">
+          <SizeNote params={params} />
           <FieldView
             scene={scene}
             simRef={simRef}

@@ -578,3 +578,19 @@ button.snap small {
   font-size: 12px;
   margin-top: 6px;
 }
+
+/* Gor'kov 유효성 안내 (주의 단계) */
+.size-note {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.status-note {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}

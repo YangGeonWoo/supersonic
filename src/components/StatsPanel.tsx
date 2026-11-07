@@ -8,7 +8,12 @@ interface Props {
   status: BallStatus;
   busy: boolean;
   simRef: MutableRefObject<BallSim | null>;
+  /** 3D 페이지: 공이 있는 덫의 횡방향 판정 (κ_ρ ≤ 0이면 true). 2D는 생략 */
+  lateralUnstable?: boolean;
 }
+
+/** 축에서 이만큼 넘게 떨어져 부양하면 '축 밖'으로 표시 [m] */
+const OFF_AXIS = 0.5e-3;
 
 const mgOf = (kg: number) => `${(kg * 1e6).toFixed(2)} mg`;
 
@@ -26,7 +31,7 @@ function Row({ k, v, hint }: { k: string; v: string; hint?: string }) {
 
 /** 공 무게와 무게 테스트 진행 (10 Hz로 simRef를 읽는다 — 매 프레임 React 상태를 바꾸지 않음) */
 function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
-  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1 });
+  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0 });
   useEffect(() => {
     const id = setInterval(() => {
       const sim = simRef.current;
@@ -38,6 +43,7 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
         active: !!t?.active,
         elapsed: t?.elapsedFall ?? t?.elapsed ?? 0,
         speed: t?.speed ?? 1,
+        x: sim.state.x,
         rhoFall: t?.rhoFall ?? null,
         rhoStart: t?.rhoStart ?? NaN,
         started: !!t,
@@ -48,7 +54,7 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
   return snap;
 }
 
-export default function StatsPanel({ scene, status, busy, simRef }: Props) {
+export default function StatsPanel({ scene, status, busy, simRef, lateralUnstable }: Props) {
   const snap = useBallSnapshot(simRef);
   if (!scene) return <div className="panel stats">음향장 계산 중…</div>;
   const { med, params, particle } = scene;
@@ -62,11 +68,27 @@ export default function StatsPanel({ scene, status, busy, simRef }: Props) {
 
   return (
     <div className="panel stats">
-      <div className={`status status-${status}`}>
-        <span>상태</span>
-        <strong>{STATUS_LABEL[status]}</strong>
-        {busy && <em className="busy">계산 중…</em>}
-      </div>
+      {(() => {
+        // 부양 중이라도 축 밖에 있거나 횡방향이 불안정하면 한 칸에서 같이 알린다
+        const offAxis = status === 'levitating' && Math.abs(snap.x) > OFF_AXIS;
+        const lateral = status === 'levitating' && !!lateralUnstable;
+        const caution = offAxis || lateral;
+        const label = !caution ? STATUS_LABEL[status] : offAxis ? '부양 (축 밖)' : '부양 (옆으로 불안정)';
+        return (
+          <div className={`status ${caution ? 'status-moving' : `status-${status}`}`}>
+            <span>상태</span>
+            <strong>{label}</strong>
+            {busy && <em className="busy">계산 중…</em>}
+            {caution && (
+              <small className="status-note">
+                {offAxis
+                  ? `위아래로는 붙잡혀 있지만 축에서 ${(Math.abs(snap.x) * 1e3).toFixed(1)} mm 벗어난 곳에 머물러 있습니다. 축 위에서는 옆으로 밀어내는 힘이 작용하는 상태입니다.`
+                  : '위아래로는 붙잡혀 있지만, 축에서 조금만 밀려도 옆으로 밀려나는 상태입니다.'}
+              </small>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="card weight">
         <div className="card-title">얼마나 무거워질 때까지 버틸까?</div>

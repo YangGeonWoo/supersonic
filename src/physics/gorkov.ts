@@ -137,7 +137,19 @@ export function gorkovPotential(p2: number, g2: number, med: Medium, p: Particle
   );
 }
 
-/** Gor'kov 근사(작은 공) 한계 경고: 공 지름이 반파장 λ/2보다 크면 true (PLAN_3D 6장) */
-export function gorkovSizeWarning(diameter: number, lambda: number): boolean {
-  return diameter > lambda / 2;
+/** Gor'kov 근사가 잘 맞는 상한 ka (이보다 크면 경향만 볼 것) */
+export const GORKOV_KA_OK = 0.5;
+
+export type GorkovValidity = 'ok' | 'caution' | 'invalid';
+
+/**
+ * Gor'kov 근사(ka ≪ 1)의 유효성. a = 지름/2.
+ *  ok      : ka < 0.5
+ *  caution : 0.5 ≤ ka < π/2 (근사 범위 밖, 경향만 의미 있음. 기본 공 3 mm는 ka ≈ 1.1)
+ *  invalid : ka ≥ π/2, 즉 지름 ≥ λ/2 (크게 어긋남, PLAN_3D 6장의 경고 기준)
+ */
+export function gorkovValidity(diameter: number, lambda: number): { ka: number; level: GorkovValidity } {
+  const ka = (Math.PI * diameter) / lambda;
+  const level: GorkovValidity = ka < GORKOV_KA_OK ? 'ok' : diameter < lambda / 2 ? 'caution' : 'invalid';
+  return { ka, level };
 }
