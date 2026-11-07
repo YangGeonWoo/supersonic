@@ -4,7 +4,7 @@
 음향장 → Gor'kov 퍼텐셜 → 음향 방사력 → 공의 운동이 하나의 계산 흐름으로 이어지고, 각 단계를 해석해와 비교해 검증했습니다.
 사양은 [`SPEC.md`](SPEC.md)에 있습니다.
 
-**사이트: https://yanggeonwoo.github.io/-/**
+**사이트: https://yanggeonwoo.github.io/supersonic/**
 (`main`에 push하면 GitHub Actions가 테스트 → 빌드 → `gh-pages` 브랜치로 자동 배포)
 
 ## 실행
