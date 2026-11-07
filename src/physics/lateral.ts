@@ -142,3 +142,16 @@ export function lateralStability(
   }
   return { zTrap, profile, kappaRho, kappaZ, ratio: kappaRho / kappaZ, stable: kappaRho > 0, ringRadius };
 }
+
+/**
+ * 반지름 ρ에서의 국소 옆 방향 강성 −dF_ρ/dρ [N/m] (양수 = 그 자리로 되돌림).
+ * 공이 축 밖 고리에 머물 때 그 자리가 안정한지 본다.
+ */
+export function localRadialStiffness(profile: RadialProfile, rho: number): number {
+  const { rho: r, Frho } = profile;
+  const n = r.length;
+  const h = r[1] - r[0];
+  let i = Math.round(rho / h);
+  i = Math.min(n - 2, Math.max(1, i));
+  return -(Frho[i + 1] - Frho[i - 1]) / (2 * h);
+}

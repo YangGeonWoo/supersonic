@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { curve, fit, hline, label, nice, readColors, symRange, vline, type Box, type Colors } from '../components/SideGraphs';
-import type { LateralResult } from '../physics/lateral';
+import { localRadialStiffness, type LateralResult } from '../physics/lateral';
 import type { BallSim } from '../sim/ballSim';
 import { lateralFor, pushEffect, trapsOf } from '../sim/lateralScene';
 import type { Scene } from '../sim/scene';
@@ -78,6 +78,8 @@ function draw(canvas: HTMLCanvasElement, r: LateralResult, ballRho: number | nul
 export default function LateralPanel({ scene, simRef, onStable }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zTrap, setZTrap] = useState<number | null>(null);
+  /** 공의 축에서 떨어진 거리 (0.05 mm 단위로 반올림해 상태를 드물게 바꿈) */
+  const [ballRho, setBallRho] = useState(0);
   const traps = useMemo(() => (scene ? trapsOf(scene) : []), [scene]);
   const result = useMemo(() => (scene && zTrap !== null ? lateralFor(scene, zTrap) : null), [scene, zTrap]);
   const push = useMemo(() => (scene && zTrap !== null ? pushEffect(scene, zTrap) : null), [scene, zTrap]);
@@ -106,6 +108,8 @@ export default function LateralPanel({ scene, simRef, onStable }: Props) {
       if (sim && ts.length) {
         const zt = nearest(ts, sim.state.z);
         setZTrap((prev) => (prev === zt ? prev : zt));
+        const rq = Math.round(Math.abs(sim.state.x) / 5e-5) * 5e-5;
+        setBallRho((prev) => (prev === rq ? prev : rq));
       }
       const c = canvasRef.current;
       if (!c || !r) return;
@@ -150,6 +154,21 @@ export default function LateralPanel({ scene, simRef, onStable }: Props) {
             <small>축 방향 κ_z = {(result.kappaZ * 1e3).toFixed(1)} mN/m</small>
           </dd>
         </div>
+        {ballRho > 0.5e-3 &&
+          (() => {
+            const kLocal = localRadialStiffness(result.profile, ballRho);
+            return (
+              <div className="stat">
+                <dt>공 위치의 옆 방향 강성</dt>
+                <dd>
+                  {(kLocal * 1e3).toFixed(2)} mN/m
+                  <small>
+                    축에서 {(ballRho * 1e3).toFixed(2)} mm — 그 자리에서 {kLocal > 0 ? '안정 (되돌아옴)' : '불안정 (더 밀려남)'}
+                  </small>
+                </dd>
+              </div>
+            );
+          })()}
       </dl>
       <div className="graph-canvas">
         <canvas ref={canvasRef} aria-label="덫 높이에서 반지름 방향 퍼텐셜 U(ρ)와 힘 F_ρ(ρ)" />

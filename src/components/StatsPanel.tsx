@@ -1,6 +1,7 @@
-import { useEffect, useState, type MutableRefObject } from 'react';
+import { useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { ASSUMED_P0_REF } from '../physics/constants';
 import { marginAt, STATUS_LABEL, theoreticalLimitDensity, type BallSim, type BallStatus } from '../sim/ballSim';
+import { fieldLimitDensity, fieldMargin, trapNear } from '../sim/limits';
 import type { Scene } from '../sim/scene';
 
 interface Props {
@@ -31,7 +32,7 @@ function Row({ k, v, hint }: { k: string; v: string; hint?: string }) {
 
 /** 공 무게와 무게 테스트 진행 (10 Hz로 simRef를 읽는다 — 매 프레임 React 상태를 바꾸지 않음) */
 function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
-  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0 });
+  const [snap, setSnap] = useState({ rho: NaN, mass: NaN, active: false, elapsed: 0, rhoFall: null as number | null, rhoStart: NaN, started: false, speed: 1, x: 0, z: NaN });
   useEffect(() => {
     const id = setInterval(() => {
       const sim = simRef.current;
@@ -44,6 +45,7 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
         elapsed: t?.elapsedFall ?? t?.elapsed ?? 0,
         speed: t?.speed ?? 1,
         x: sim.state.x,
+        z: sim.state.z,
         rhoFall: t?.rhoFall ?? null,
         rhoStart: t?.rhoStart ?? NaN,
         started: !!t,
@@ -56,13 +58,17 @@ function useBallSnapshot(simRef: MutableRefObject<BallSim | null>) {
 
 export default function StatsPanel({ scene, status, busy, simRef, lateralUnstable }: Props) {
   const snap = useBallSnapshot(simRef);
+  // 공이 있는 덫 (없으면 가운데 쪽). 한계는 2D 장 기준 — 덫·장면이 바뀔 때만 다시 계산
+  const zTrap = scene ? trapNear(scene, Number.isFinite(snap.z) ? snap.z : scene.params.d / 2) : null;
+  const rhoField = useMemo(() => (scene && zTrap !== null ? fieldLimitDensity(scene, zTrap) : NaN), [scene, zTrap]);
   if (!scene) return <div className="panel stats">음향장 계산 중…</div>;
   const { med, params, particle } = scene;
 
   const rho = Number.isFinite(snap.rho) ? snap.rho : particle.rhoP;
   const mass = Number.isFinite(snap.mass) ? snap.mass : particle.m;
-  const margin = marginAt(scene, rho);
-  const rhoLimit = theoreticalLimitDensity(scene);
+  const margin = zTrap !== null ? fieldMargin(scene, zTrap, rho) : marginAt(scene, rho);
+  const rhoAnalytic = theoreticalLimitDensity(scene);
+  const rhoLimit = Number.isFinite(rhoField) ? rhoField : rhoAnalytic;
   const massLimit = rhoLimit * particle.V;
   const frac = Math.min(1, mass / massLimit);
 
@@ -99,14 +105,16 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
           </div>
           <div className="right">
             <div className="big">{mgOf(massLimit)}</div>
-            <small>이론 한계 (F_max = mg)</small>
+            <small>부양 한계 (2D 장 기준)</small>
           </div>
         </div>
-        <div className="meter" aria-label="이론 한계 대비 현재 무게">
+        <div className="meter" aria-label="부양 한계 대비 현재 무게">
           <div className={`meter-fill ${frac > 0.8 ? 'hot' : ''}`} style={{ width: `${frac * 100}%` }} />
         </div>
         <small>
-          지금 무게의 <b>{(massLimit / mass).toFixed(1)}배</b>까지 버틸 수 있음 (힘 여유 F_max/mg = {margin.toFixed(2)})
+          지금 무게의 <b>{(massLimit / mass).toFixed(1)}배</b>까지 버틸 수 있음 (힘 여유 {margin.toFixed(2)}배)
+          <br />
+          1차원 해석식(F_max = mg)으로는 {mgOf(rhoAnalytic * particle.V)} — 발생기 근접장 때문에 실제 장의 힘이 그보다 약함
         </small>
 
         {snap.started && (
@@ -117,7 +125,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
                 {snap.elapsed.toFixed(1)}초 버팀{snap.speed !== 1 && ` (${snap.speed}× 속도)`}
                 <br />
                 <small>
-                  이론 한계 대비 {((snap.rhoFall / rhoLimit) * 100).toFixed(0)}% (2차원 장·진동 때문에 조금 일찍 떨어질 수 있음)
+                  부양 한계(2D 장) 대비 {((snap.rhoFall / rhoLimit) * 100).toFixed(0)}%
                 </small>
               </>
             ) : snap.active ? (

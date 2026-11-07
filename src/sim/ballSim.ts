@@ -15,6 +15,7 @@ import {
 import { sampleForceFor, samplePush } from '../physics/field2d';
 import { makeParticle, maxForce, maxLevitationDensity, stiffness } from '../physics/gorkov';
 import { dampingCoeff, initState, verletStep, type BallState, type Dynamics } from '../physics/integrator';
+import { fieldLimitDensity, trapNear } from './limits';
 import type { Scene } from './scene';
 
 export type BallStatus = 'levitating' | 'falling' | 'escaped' | 'moving';
@@ -95,6 +96,7 @@ export function sceneDynamics(scene: Scene, g = GRAVITY, rhoP = scene.particle.r
   const dyn: SceneDynamics = {
     m: p.m,
     cd: scene.cd,
+    cdx: scene.cdx,
     g,
     zMin: p.a,
     zMax: scene.params.d - p.a,
@@ -120,7 +122,9 @@ export function setDensity(dyn: SceneDynamics, scene: Scene, rhoP: number): void
   dyn.load.f1 = p.f1;
   dyn.load.f2 = p.f2;
   dyn.m = p.m;
-  dyn.cd = dampingCoeff(scene.params.zeta, p.m, stiffness(scene.P0, scene.med, p));
+  const kA = stiffness(scene.P0, scene.med, p);
+  dyn.cd = dampingCoeff(scene.params.zeta, p.m, kA);
+  dyn.cdx = dampingCoeff(scene.params.zeta, p.m, scene.lateralRatio * kA);
 }
 
 /** 무게 늘리기 테스트 상태 */
@@ -128,7 +132,7 @@ export interface WeightTest {
   active: boolean;
   /** 시작 밀도 */
   rhoStart: number;
-  /** 이론 한계 밀도 (A층식, F_max = mg) */
+  /** 한계 밀도 (2D 장 기준, 시작할 때 공이 있던 덫) */
   rhoLimit: number;
   /** 밀도 증가율 [1/s, 실제 시간] (지수 증가) */
   rate: number;
@@ -149,6 +153,14 @@ export interface WeightTest {
 
 /** 이론 한계까지 걸리는 실제 시간 [s] */
 export const WEIGHT_TEST_SECONDS = 20;
+
+/**
+ * 무게 늘리기 중 공이 덫에 있는 동안 내부 시뮬레이션 시간을 이만큼 빨리 돌린다.
+ * 화면 시간 배율(0.05)대로만 돌리면 무게가 늘어나는 20초 동안 공의 시간이 1초밖에 안 흘러,
+ * 공이 따라가지 못하고 한계보다 약 17% 무거워져서야 떨어진다(준정적이 아님).
+ * 덫을 벗어난 뒤에는 원래 속도로 돌려 낙하 장면은 그대로 보이게 한다.
+ */
+export const WEIGHT_TEST_BOOST = 32;
 
 /** 무게 늘리기 배속 선택지 */
 export const WEIGHT_SPEEDS = [1, 2, 5, 10] as const;
@@ -180,8 +192,8 @@ export class BallSim {
     this.status = this.tracker.update(this.state);
   }
 
-  /** 시뮬레이션 시간 simDt만큼 진행 (단계 상한 maxSteps) */
-  advanceSim(simDt: number, maxSteps = Number.POSITIVE_INFINITY): number {
+  /** 시뮬레이션 시간 simDt만큼 진행 (단계 상한 maxSteps). stop()이 참이 되면 그 단계에서 멈추고 남은 시간은 버린다 */
+  advanceSim(simDt: number, maxSteps = Number.POSITIVE_INFINITY, stop?: () => boolean): number {
     this.acc += simDt;
     let n = 0;
     while (this.acc >= this.dt && n < maxSteps) {
@@ -193,6 +205,10 @@ export class BallSim {
       this.status = this.tracker.update(this.state);
       this.acc -= this.dt;
       n++;
+      if (stop && stop()) {
+        this.acc = 0;
+        break;
+      }
     }
     if (n >= maxSteps) this.acc = 0; // 따라잡지 못한 시간은 버린다
     return n;
@@ -206,8 +222,12 @@ export class BallSim {
       const dyn = this.dyn as SceneDynamics;
       if (t.rhoFall === null) setDensity(dyn, scene, dyn.load.rhoP * Math.exp(t.rate * t.speed * realDt));
     }
-    const playback = t && t.active ? t.speed : 1;
-    const n = this.advanceSim(realDt * timeScale * playback, MAX_STEPS_PER_FRAME);
+    const holding = !!t && t.active && t.rhoFall === null;
+    const boost = holding ? WEIGHT_TEST_BOOST : 1;
+    const playback = (t && t.active ? t.speed : 1) * boost;
+    // 빠르게 돌리는 동안 덫을 벗어나면 그 단계에서 멈춘다 (낙하 장면은 다음 프레임부터 원래 속도로)
+    const stop = holding ? () => this.state.z < t!.zEscape || this.status === 'falling' || this.status === 'escaped' : undefined;
+    const n = this.advanceSim(realDt * timeScale * playback, MAX_STEPS_PER_FRAME * boost, stop);
     if (t && t.active) {
       const rho = (this.dyn as SceneDynamics).load.rhoP;
       // 덫을 벗어난 순간의 무게를 기록 (바닥까지 떨어지는 동안 무게가 더 늘지 않도록)
@@ -235,10 +255,11 @@ export class BallSim {
     return this.dyn.m;
   }
 
-  /** 무게 늘리기 시작: 이론 한계까지 약 20초 / speed 걸리는 속도로 밀도를 지수적으로 늘린다 */
+  /** 무게 늘리기 시작: 2D 장 기준 한계까지 약 20초 / speed 걸리는 속도로 밀도를 지수적으로 늘린다 */
   startWeightTest(scene: Scene, speed = 1): void {
     const rho = this.density;
-    const rhoLimit = theoreticalLimitDensity(scene);
+    const zt = trapNear(scene, this.state.z);
+    const rhoLimit = zt !== null ? fieldLimitDensity(scene, zt) : theoreticalLimitDensity(scene);
     const rate = Math.max(0.02, Math.log(Math.max(rhoLimit / rho, 1.05)) / WEIGHT_TEST_SECONDS);
     this.test = { active: true, rhoStart: rho, rhoLimit, rate, elapsed: 0, speed, rhoFall: null, elapsedFall: null, zEscape: this.state.z - scene.med.lambda / 4 };
   }

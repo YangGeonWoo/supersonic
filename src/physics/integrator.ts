@@ -11,8 +11,13 @@ export type ForceFn = (x: number, z: number, out: { fx: number; fz: number }) =>
 export interface Dynamics {
   /** 질량 [kg] */
   m: number;
-  /** 감쇠 계수 [kg/s] */
+  /** 감쇠 계수 [kg/s] (z 방향, cdx가 없으면 x 방향에도 사용) */
   cd: number;
+  /**
+   * x(옆) 방향 감쇠 계수 [kg/s] (가정값). 유효 감쇠비 ζ를 방향마다 같게 주려고 옆 방향 강성으로 따로 정한다.
+   * 없으면 cd와 같음 (등방 감쇠).
+   */
+  cdx?: number;
   /** 중력가속도 [m/s²] (0이면 중력 없음) */
   g: number;
   /** 공 중심이 움직일 수 있는 z 범위 (면과 만나면 속도 0) */
@@ -37,7 +42,7 @@ const tmp = { fx: 0, fz: 0 };
 
 function accel(dyn: Dynamics, s: BallState): void {
   dyn.force(s.x, s.z, tmp);
-  s.ax = (tmp.fx - dyn.cd * s.vx) / dyn.m;
+  s.ax = (tmp.fx - (dyn.cdx ?? dyn.cd) * s.vx) / dyn.m;
   s.az = (tmp.fz - dyn.cd * s.vz) / dyn.m - dyn.g;
 }
 
@@ -79,13 +84,13 @@ export function verletStep(dyn: Dynamics, s: BallState, dt: number): void {
   s.z += dt * vhz;
   s.t += dt;
   dyn.force(s.x, s.z, tmp);
-  const den = 1 + (h * dyn.cd) / dyn.m;
-  s.vx = (vhx + (h * tmp.fx) / dyn.m) / den;
-  s.vz = (vhz + h * (tmp.fz / dyn.m - dyn.g)) / den;
+  const cdx = dyn.cdx ?? dyn.cd;
+  s.vx = (vhx + (h * tmp.fx) / dyn.m) / (1 + (h * cdx) / dyn.m);
+  s.vz = (vhz + h * (tmp.fz / dyn.m - dyn.g)) / (1 + (h * dyn.cd) / dyn.m);
   if (applyWalls(dyn, s)) {
     accel(dyn, s);
   } else {
-    s.ax = (tmp.fx - dyn.cd * s.vx) / dyn.m;
+    s.ax = (tmp.fx - cdx * s.vx) / dyn.m;
     s.az = (tmp.fz - dyn.cd * s.vz) / dyn.m - dyn.g;
   }
 }

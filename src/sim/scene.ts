@@ -12,6 +12,7 @@ import {
   axisMaxPressure,
   axisPotential,
   axisPressureNodes,
+  findLocalMinima,
   computeAxisProfile,
   computeDomain,
   computeFieldGrid,
@@ -26,6 +27,7 @@ import { dampingCoeff, oscillationPeriod, timeStep } from '../physics/integrator
 import type { SimParams } from '../physics/params';
 import { resonanceGain } from '../physics/resonance';
 import { pushCoefficient, radiationForceFunction } from '../physics/scattering';
+import { lateralStability } from '../physics/lateral';
 import { makeSourceSet, sampleDisc, type DiscSample, type SourceSet } from '../physics/sourceSampling';
 
 /** 음향장(1단계)을 정하는 변수 */
@@ -94,6 +96,13 @@ export interface Scene extends FieldData {
   axisFpush: Float64Array;
   /** 축 위 F_z 합계 = axisF + axisFpush [N] */
   axisFz: Float64Array;
+  /**
+   * 가운데 덫의 횡방향 강성 κ_ρ / A층 κ (옆 방향 감쇠 계수용 비율).
+   * 옆 방향 감쇠 c_dx = 2ζ·√(m·|ratio|·κ_A) — 유효 감쇠비 ζ를 위아래와 옆에 같게 준다 (가정값).
+   */
+  lateralRatio: number;
+  /** 옆 방향 감쇠 계수 [kg/s] */
+  cdx: number;
 }
 
 /** 원판 샘플 재사용 (a_t, λ가 같으면 같은 좌표) */
@@ -138,8 +147,18 @@ export function finishScene(fd: FieldData, input: SimParams, cal: Calibration): 
     axisFpush[i] = pushCoeff * s * s * fd.axis.Iz[i];
     axisFz[i] = axisF[i] + axisFpush[i];
   }
+  // 가운데 덫(d/2에 가장 가까운 U 최소)의 횡방향 강성
+  const mins = findLocalMinima(fd.axis.z, axisU).map((m) => m.z);
+  let lateralRatio = 0.05; // 덫이 없을 때의 기본값 (가운데 덫 결과의 전형값)
+  if (mins.length > 0 && kappa > 0) {
+    const zc = mins.reduce((a, b) => (Math.abs(b - params.d / 2) < Math.abs(a - params.d / 2) ? b : a));
+    const lat = lateralStability(fd.sources, med, particle, s * s, zc, fd.axis.z, axisFz, params.directivity, pushCoeff, 4e-3);
+    if (Math.abs(lat.kappaRho) > 0) lateralRatio = Math.abs(lat.kappaRho) / kappa;
+  }
   return {
     ...fd,
+    lateralRatio,
+    cdx: dampingCoeff(params.zeta, particle.m, lateralRatio * kappa),
     params,
     particle,
     potential,

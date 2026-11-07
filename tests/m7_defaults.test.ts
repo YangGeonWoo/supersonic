@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { calibrate } from '../src/physics/calibration';
 import { defaultParams } from '../src/physics/params';
-import { createBallSim, theoreticalLimitDensity, WEIGHT_SPEEDS, WEIGHT_TEST_SECONDS } from '../src/sim/ballSim';
+import { createBallSim, WEIGHT_SPEEDS, WEIGHT_TEST_SECONDS } from '../src/sim/ballSim';
+import { fieldLimitDensity, trapNear } from '../src/sim/limits';
 import { buildScene } from '../src/sim/scene';
 
 const app = defaultParams();
@@ -28,7 +29,8 @@ describe('앱 기본값', () => {
 
 describe('무게 늘리기 배속', () => {
   const sc = buildScene(app, cal);
-  const limit = theoreticalLimitDensity(sc);
+  // 2D 장 기준 한계 (공을 놓는 가운데 덫)
+  const limit = fieldLimitDensity(sc, trapNear(sc, createBallSim(sc).state.z)!);
 
   function run(speed: number) {
     const sim = createBallSim(sc);
@@ -43,14 +45,14 @@ describe('무게 늘리기 배속', () => {
   }
 
   for (const speed of WEIGHT_SPEEDS) {
-    it(`${speed}×: 이론 한계 근처에서 떨어지고, 걸린 시간은 약 1/${speed}`, () => {
+    it(`${speed}×: 2D 장 한계에서 떨어지고, 걸린 시간은 약 1/${speed}`, () => {
       const sim = run(speed);
       const t = sim.test!;
       const ratio = t.rhoFall! / limit;
-      console.log(`[배속] ${speed}×: 이론 한계의 ${(ratio * 100).toFixed(1)}%에서 낙하, ${t.elapsedFall!.toFixed(2)} s (바닥 도달 ${t.elapsed.toFixed(2)} s)`);
+      console.log(`[배속] ${speed}×: 2D 장 한계의 ${(ratio * 100).toFixed(1)}%에서 낙하, ${t.elapsedFall!.toFixed(2)} s (바닥 도달 ${t.elapsed.toFixed(2)} s)`);
       expect(t.rhoFall).not.toBeNull();
-      expect(ratio).toBeGreaterThan(0.85);
-      expect(ratio).toBeLessThan(1.05);
+      expect(ratio).toBeGreaterThan(0.97);
+      expect(ratio).toBeLessThan(1.02);
       expect(t.elapsedFall!).toBeLessThan((WEIGHT_TEST_SECONDS / speed) * 1.1);
       expect(t.elapsedFall!).toBeGreaterThan((WEIGHT_TEST_SECONDS / speed) * 0.8);
     });
