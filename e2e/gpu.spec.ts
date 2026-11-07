@@ -60,7 +60,8 @@ test.describe('3D 페이지 GPU 3D 격자 모드', () => {
     await expect(page.locator('.stiffness .stat').first()).toBeVisible({ timeout: 60_000 });
     await page.getByRole('radio', { name: '축대칭 (CPU)' }).check();
     await expect(page.locator('.lateral:not(.stiffness)')).toContainText('횡방향', { timeout: 30_000 });
-    await expect(page.locator('fieldset.pose')).toBeDisabled();
+    // 축대칭 모드에서는 기울기·어긋남 슬라이더를 쓸 수 없음 (fieldset disabled → 안의 input)
+    await expect(page.locator('fieldset.pose input').first()).toBeDisabled();
     await page.getByRole('radio', { name: /GPU 3D 격자/ }).check();
     await expect(page.locator('.stiffness .stat').first()).toBeVisible({ timeout: 60_000 });
   });
