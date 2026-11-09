@@ -10,13 +10,14 @@ import StiffnessPanel from './components3d/StiffnessPanel';
 import View3D from './components3d/View3D';
 import { defaultParams, type SimParams } from './physics/params';
 import { AMP_RATIO_SLIDER, POSE_SLIDERS } from './state/sliders';
+import { applyUrlParams } from './state/urlParams';
 import { defaultGridRes, GRID_LABEL, useGpuSim, type GridRes } from './state/useGpuSim';
 import { useSimulation } from './state/useSimulation';
 import './index.css';
 
 /** 3D 페이지 기본값: 2D와 같고 진행파 복사압(밀림)과 반사파 직접 계산을 켠다 */
 export function default3DParams(): SimParams {
-  return { ...defaultParams(), travelingForce: true, reflections: true };
+  return applyUrlParams({ ...defaultParams(), travelingForce: true, reflections: true });
 }
 
 /** 3D 장 표시 기본값: 압력장을 볼륨으로 켠 상태 */
@@ -84,6 +85,7 @@ export default function App3D() {
           onWeightTest={() => gpu.onWeightTest(sim.weightSpeed)}
           weightSpeed={sim.weightSpeed}
           onWeightSpeed={onWeightSpeed}
+          p0={scene?.P0}
           forcesLabel="힘 화살표 (음향 방사력 + 중력 + 밀림)"
           extraCore={
             <>

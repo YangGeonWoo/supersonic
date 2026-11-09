@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { ASSUMED_P0_REF } from '../physics/constants';
+import { gorkovValidity } from '../physics/gorkov';
 import { marginAt, STATUS_LABEL, theoreticalLimitDensity, type BallStatus, type WeightTest } from '../sim/ballSim';
 import { fieldLimitDensity, fieldMargin, trapNear } from '../sim/limits';
 import type { Scene } from '../sim/scene';
@@ -26,12 +27,19 @@ interface Props {
 /** 축에서 이만큼 넘게 떨어져 부양하면 '축 밖'으로 표시 [m] */
 const OFF_AXIS = 0.5e-3;
 
-const mgOf = (kg: number) => `${(kg * 1e6).toFixed(2)} mg`;
+/** mg 표시: 작은 공(지름 1 mm대, 수십 µg)도 읽히게 유효숫자 3자리 */
+const mgOf = (kg: number) => {
+  const mg = kg * 1e6;
+  return `${mg >= 100 ? mg.toFixed(1) : mg.toPrecision(3)} mg`;
+};
 
-function Row({ k, v, hint }: { k: string; v: string; hint?: string }) {
+function Row({ k, v, hint, badge }: { k: string; v: string; hint?: string; badge?: string }) {
   return (
     <div className="stat">
-      <dt>{k}</dt>
+      <dt>
+        {k}
+        {badge && <span className="badge">{badge}</span>}
+      </dt>
       <dd>
         {v}
         {hint && <small>{hint}</small>}
@@ -85,6 +93,8 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
   const rhoLimit = lim3 ? lim3.rhoLimit : Number.isFinite(rhoField) ? rhoField : rhoAnalytic;
   const massLimit = rhoLimit * particle.V;
   const frac = Math.min(1, mass / massLimit);
+  // 공 지름 ≥ λ/2: Gor'kov 근사가 크게 어긋나므로 한계 숫자를 흐리게 (계산은 그대로)
+  const outOfModel = gorkovValidity(params.ballDiameter, med.lambda).level === 'invalid';
 
   return (
     <div className="panel stats">
@@ -110,9 +120,14 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
         );
       })()}
 
-      <div className="card weight">
+      <div className={`card weight${outOfModel ? ' out-of-model' : ''}`}>
         <div className="card-title">얼마나 무거워질 때까지 버틸까?</div>
-        <div className="big-row">
+        {outOfModel && (
+          <div className="model-badge" role="note">
+            모델 범위 밖 (공 지름 ≥ λ/2 = {((med.lambda / 2) * 1e3).toFixed(1)} mm) — 아래 숫자는 믿으면 안 됩니다
+          </div>
+        )}
+        <div className="big-row dim-if-out">
           <div>
             <div className="big">{mgOf(mass)}</div>
             <small>지금 공 무게 (밀도 {rho.toFixed(0)} kg/m³)</small>
@@ -122,10 +137,10 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
             <small>부양 한계 ({limitsFor ? '3D 격자' : '2D 장'} 기준)</small>
           </div>
         </div>
-        <div className="meter" aria-label="부양 한계 대비 현재 무게">
+        <div className="meter dim-if-out" aria-label="부양 한계 대비 현재 무게">
           <div className={`meter-fill ${frac > 0.8 ? 'hot' : ''}`} style={{ width: `${frac * 100}%` }} />
         </div>
-        <small>
+        <small className="dim-if-out">
           지금 무게의 <b>{(massLimit / mass).toFixed(1)}배</b>까지 버틸 수 있음 (힘 여유 {margin.toFixed(2)}배)
           <br />
           1차원 해석식(F_max = mg)으로는 {mgOf(rhoAnalytic * particle.V)} — 발생기 근접장 때문에 실제 장의 힘이 그보다 약함
@@ -152,7 +167,7 @@ export default function StatsPanel({ scene, status, busy, simRef, lateralUnstabl
       </div>
 
       <dl>
-        <Row k="음압 P0" v={`${scene.P0.toFixed(0)} Pa`} hint={`${scene.spl.toFixed(0)} dB`} />
+        <Row k="음압 P0" badge="가정값" v={`${scene.P0.toFixed(0)} Pa`} hint={`${scene.spl.toFixed(0)} dB · 가상 조건 (구동 세기 1 = ${ASSUMED_P0_REF} Pa)`} />
         <Row k="마디 개수" v={`${scene.nodesB.length}`} hint={`간격 λ/2 = ${((med.lambda / 2) * 1e3).toFixed(2)} mm`} />
       </dl>
 

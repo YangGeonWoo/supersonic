@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ASSUMED_P0_REF } from '../physics/constants';
 import type { SimParams } from '../physics/params';
 import { WEIGHT_SPEEDS, WEIGHT_TEST_SECONDS } from '../sim/ballSim';
 import { SLIDERS, type SliderDef } from '../state/sliders';
@@ -27,6 +28,8 @@ interface Props {
   extraCore?: ReactNode;
   /** 힘 화살표 체크박스 문구 */
   forcesLabel?: string;
+  /** 지금 음압 P0 [Pa] (구동 세기 슬라이더 아래에 가정값 기준으로 표시) */
+  p0?: number;
 }
 
 /** 기본으로 보여줄 핵심 조작 */
@@ -98,6 +101,11 @@ export default function ControlPanel(p: Props) {
         {core.map((s) => (
           <div key={s.key}>
             <Slider s={s} params={p.params} onChange={p.onChange} />
+            {s.key === 'drive' && p.p0 !== undefined && (
+              <small className="p0-note">
+                → 음압 P0 ≈ <b>{p.p0.toFixed(0)} Pa</b> (가상값: 구동 세기 1 = {ASSUMED_P0_REF} Pa)
+              </small>
+            )}
             {s.key === 'd' && (
               <button className="snap" onClick={p.onSnapResonance} title="d를 λ/2의 가장 가까운 정수배로">
                 가장 가까운 공진 거리로 맞추기

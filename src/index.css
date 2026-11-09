@@ -331,6 +331,7 @@ dl {
 }
 .stat dt {
   color: var(--muted);
+  white-space: nowrap;
 }
 .stat dd {
   margin: 0;
@@ -649,3 +650,26 @@ fieldset.pose {
   font-size: 12px;
 }
 
+/* 발표용: 구동 세기 아래 음압, 모델 범위 밖 표시 */
+.p0-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin: -2px 0 6px;
+}
+.p0-note b {
+  color: var(--fg);
+}
+.out-of-model .dim-if-out {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+.model-badge {
+  margin: 4px 0 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #b45309;
+}

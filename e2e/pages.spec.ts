@@ -37,8 +37,23 @@ test.describe('2D 페이지', () => {
     await expect(mainStatus(page)).toHaveText('부양', { timeout: 45_000 });
     await expect(page.locator('.stats')).toContainText('1500 Pa');
     await expect(page.locator('.stats')).toContainText('마디 개수');
-    await expect(page.locator('.size-note')).toContainText('ka = 1.10');
+    // 기본 공 지름 1.2 mm: Gor'kov 근사 범위 안이라 크기 안내가 없음
+    await expect(page.locator('.size-note')).toHaveCount(0);
+    await expect(page.locator('.stats .stat').filter({ hasText: '음압 P0' })).toContainText('가정값');
     expect(errors).toEqual([]);
+  });
+
+  test('발표용: 구동 세기 2 → P0 3000 Pa, 큰 공은 모델 범위 밖 표시', async ({ page }) => {
+    await page.goto('./?dia=6');
+    await expect(mainStatus(page)).not.toHaveText('계산 중', { timeout: 45_000 });
+    await expect(page.locator('.warn')).toContainText('ka = 2.20');
+    await expect(page.locator('.card.weight.out-of-model .model-badge')).toContainText('모델 범위 밖');
+    await page.goto('./?dia=1.2');
+    await expect(page.locator('.p0-note')).toContainText('1500 Pa', { timeout: 45_000 });
+    await expect(page.locator('.card.weight.out-of-model')).toHaveCount(0);
+    await setSlider(page, '구동 세기', 2);
+    await expect(page.locator('.p0-note')).toContainText('3000 Pa');
+    await expect(page.locator('.stats')).toContainText('3000 Pa');
   });
 
   test('구동 세기를 거의 0으로 내리면 떨어짐', async ({ page }) => {

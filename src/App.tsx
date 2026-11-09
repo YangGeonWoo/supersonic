@@ -4,12 +4,18 @@ import Legend from './components/Legend';
 import SideGraphs from './components/SideGraphs';
 import SizeNote from './components/SizeNote';
 import StatsPanel from './components/StatsPanel';
-import { defaultParams } from './physics/params';
+import { defaultParams, type SimParams } from './physics/params';
+import { applyUrlParams } from './state/urlParams';
 import { useSimulation } from './state/useSimulation';
 import './index.css';
 
+/** 2D 페이지 기본값: 공 지름 1.2 mm (ka ≈ 0.44, Gor'kov 근사 범위 안). 주소의 ?dia=&drive=&rho=가 있으면 그 값 */
+export function default2DParams(): SimParams {
+  return applyUrlParams({ ...defaultParams(), ballDiameter: 1.2e-3 });
+}
+
 export default function App() {
-  const sim = useSimulation(defaultParams);
+  const sim = useSimulation(default2DParams);
   const { params, scene, simRef } = sim;
 
   return (
@@ -42,6 +48,7 @@ export default function App() {
           onWeightTest={sim.onWeightTest}
           weightSpeed={sim.weightSpeed}
           onWeightSpeed={sim.onWeightSpeed}
+          p0={scene?.P0}
         />
         <section className="view">
           <SizeNote params={params} />
