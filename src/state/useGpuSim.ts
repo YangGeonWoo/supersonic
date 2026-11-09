@@ -1,6 +1,6 @@
 /**
  * 3D 페이지의 GPU 3D 격자 모드 상태: GPU 장 계산(디바운스), 3D 장면, 3D 공, 무게 늘리기.
- * GPU를 쓸 수 없으면 supported = false (화면은 축대칭 CPU 모드로).
+ * GPU를 쓸 수 없으면 supported = false (3D 페이지는 안내와 2D 링크만 보여준다).
  * 공의 위치·속도는 React 상태가 아니라 sim3Ref에 있고 View3D의 rAF 루프에서 진행한다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,7 +29,7 @@ export function defaultGridRes(): GridRes {
   return 'normal';
 }
 
-export function useGpuSim(params: SimParams, enabled: boolean, res: GridRes) {
+export function useGpuSim(params: SimParams, res: GridRes) {
   const gpuRef = useRef<GpuField | null | undefined>(undefined);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [grid, setGrid] = useState<{ grid: Grid3; ms: number } | null>(null);
@@ -56,7 +56,7 @@ export function useGpuSim(params: SimParams, enabled: boolean, res: GridRes) {
   // 장 변수·해상도가 바뀌면 디바운스 후 GPU 계산
   const fpKey = JSON.stringify({ ...fieldParamsOf(params), res });
   useEffect(() => {
-    if (!enabled || !supported) return;
+    if (!supported) return;
     setBusy(true);
     const id = ++reqId.current;
     const t = setTimeout(async () => {
@@ -81,7 +81,7 @@ export function useGpuSim(params: SimParams, enabled: boolean, res: GridRes) {
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [fpKey, enabled, supported]);
+  }, [fpKey, supported]);
 
   const cal = useMemo(() => calibrate(params.directivity, params.reflections), [params.directivity, params.reflections]);
 
@@ -89,8 +89,8 @@ export function useGpuSim(params: SimParams, enabled: boolean, res: GridRes) {
   const { timeScale: _t, releaseAzimuth: _a, ...phys } = params;
   const physKey = JSON.stringify(phys);
   const scene3 = useMemo(
-    () => (grid && enabled ? finishScene3(grid.grid, { ...(JSON.parse(physKey) as SimParams), timeScale: 0, releaseAzimuth: 0 }, cal, grid.ms, 'gpu') : null),
-    [grid, physKey, cal, enabled],
+    () => (grid ? finishScene3(grid.grid, { ...(JSON.parse(physKey) as SimParams), timeScale: 0, releaseAzimuth: 0 }, cal, grid.ms, 'gpu') : null),
+    [grid, physKey, cal],
   );
 
   const azimuth = params.releaseAzimuth;

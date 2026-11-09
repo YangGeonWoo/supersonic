@@ -115,7 +115,7 @@ export default function StiffnessPanel({ scene3: sc, sim3Ref, busy, error, res, 
         )}
       </dl>
       <small className="note">
-        x-y 단면과 '덫 등치면'으로 덫 모양을 볼 수 있습니다. 위 발생기를 기울이면 마디 면이 함께 기울어 덫이 옆으로 옮겨 가고(바깥 덫일수록
+        표시를 '퍼텐셜 U' + '등치면'으로 바꾸면 덫 모양을 입체로 볼 수 있습니다. 위 발생기를 기울이면 마디 면이 함께 기울어 덫이 옆으로 옮겨 가고(바깥 덫일수록
         크게), 옆 강성은 방향에 따라 조금 달라집니다.
       </small>
     </div>

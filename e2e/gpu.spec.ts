@@ -29,7 +29,6 @@ test.describe('3D 페이지 GPU 3D 격자 모드', () => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('./3d.html?res=low&selftest');
-    await expect(page.getByRole('radio', { name: /GPU 3D 격자/ })).toBeChecked();
     const st = page.locator('.stiffness .selftest dd');
     await expect(st).toBeVisible({ timeout: 60_000 });
     const text = (await st.textContent()) ?? '';
@@ -55,14 +54,25 @@ test.describe('3D 페이지 GPU 3D 격자 모드', () => {
     await expect.poll(async () => (await trapPos(page))[0], { timeout: 60_000 }).toBeGreaterThan(0.3);
   });
 
-  test('축대칭 CPU 모드로 바꾸면 기존 횡방향 패널, 다시 GPU로', async ({ page }) => {
+  test('3D 표시 전환: 값·볼륨/등치면·절반 자르기마다 화면이 바뀌고 오류 없음', async ({ page }) => {
+    test.setTimeout(240_000); // SwiftShader에서는 레이 마칭 한 프레임이 느림
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('./3d.html?res=low');
     await expect(page.locator('.stiffness .stat').first()).toBeVisible({ timeout: 60_000 });
-    await page.getByRole('radio', { name: '축대칭 (CPU)' }).check();
-    await expect(page.locator('.lateral:not(.stiffness)')).toContainText('횡방향', { timeout: 30_000 });
-    // 축대칭 모드에서는 기울기·어긋남 슬라이더를 쓸 수 없음 (fieldset disabled → 안의 input)
-    await expect(page.locator('fieldset.pose input').first()).toBeDisabled();
-    await page.getByRole('radio', { name: /GPU 3D 격자/ }).check();
-    await expect(page.locator('.stiffness .stat').first()).toBeVisible({ timeout: 60_000 });
+    const canvas = page.locator('canvas.view3d-canvas');
+    const shots: Buffer[] = [await canvas.screenshot()];
+    const step = async (act: () => Promise<unknown>) => {
+      await act();
+      await page.waitForTimeout(800);
+      const s = await canvas.screenshot();
+      expect(shots.every((p) => Buffer.compare(p, s) !== 0)).toBe(true);
+      shots.push(s);
+    };
+    await step(() => page.getByRole('combobox', { name: '표현' }).selectOption('iso'));
+    await step(() => page.getByRole('checkbox', { name: '절반 자르기' }).check());
+    await step(() => page.getByRole('combobox', { name: '값' }).selectOption('potential'));
+    await step(() => page.getByRole('combobox', { name: '값' }).selectOption('instant'));
+    expect(errors).toEqual([]);
   });
 });

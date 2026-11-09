@@ -620,21 +620,11 @@ button.snap small {
 }
 
 /* GPU 3D 격자 모드 */
-fieldset.compute-mode,
 fieldset.pose {
   border: none;
   border-top: 1px solid var(--border);
   margin: 8px 0 4px;
   padding: 6px 0 0;
-}
-fieldset.pose:disabled {
-  opacity: 0.55;
-}
-.pose-note {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  margin-top: -4px;
 }
 .tool-select {
   display: flex;
@@ -658,3 +648,4 @@ fieldset.pose:disabled {
 .selftest dd {
   font-size: 12px;
 }
+
